@@ -1,0 +1,135 @@
+﻿using System.Collections.Concurrent;
+using UAI.ZeroVP.Data.Abstractions;
+using UAI.ZeroVP.Data.Entities;
+using UAI.ZeroVP.DTO;
+
+namespace UAI.ZeroVP.Data.InMemory;
+
+/// <summary>
+/// Úložiště úkolů v operační paměti procesu.
+/// <para>
+/// POZOR – klíčový bod pro výuku Dockeru: data žijí jen uvnitř běžícího procesu.
+/// Zastavením kontejneru (nebo jen restartem aplikace) se nenávratně ztratí
+/// a každá replika kontejneru má vlastní, na ostatních nezávislou sadu dat.
+/// </para>
+/// <para>
+/// <see cref="ConcurrentDictionary{TKey,TValue}"/> zajišťuje bezpečný souběžný přístup –
+/// webový server obsluhuje požadavky ve více vláknech současně.
+/// </para>
+/// </summary>
+public sealed class InMemoryTodoRepository : ITodoRepository
+{
+    private readonly ConcurrentDictionary<Guid, TodoItem> _items = new();
+    private readonly TimeProvider _timeProvider;
+
+    /// <summary>
+    /// Vytvoří úložiště a volitelně ho naplní ukázkovými daty.
+    /// </summary>
+    /// <param name="options">Nastavení úložiště.</param>
+    /// <param name="timeProvider">Zdroj času – umožňuje čas podvrhnout v testech.</param>
+    public InMemoryTodoRepository(InMemoryTodoOptions? options = null, TimeProvider? timeProvider = null)
+    {
+        _timeProvider = timeProvider ?? TimeProvider.System;
+
+        if (options?.SeedSampleData ?? true)
+        {
+            Seed();
+        }
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<TodoItem>> GetAllAsync(bool? isCompleted = null, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        IReadOnlyList<TodoItem> result = _items.Values
+            .Where(item => isCompleted is null || item.IsCompleted == isCompleted)
+            .OrderByDescending(item => item.Priority)
+            .ThenBy(item => item.CreatedAtUtc)
+            .Select(item => item.Clone())
+            .ToList();
+
+        return Task.FromResult(result);
+    }
+
+    /// <inheritdoc />
+    public Task<TodoItem?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return Task.FromResult(_items.TryGetValue(id, out var item) ? item.Clone() : null);
+    }
+
+    /// <inheritdoc />
+    public Task<TodoItem> AddAsync(TodoItem item, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var stored = item.Clone();
+        if (!_items.TryAdd(stored.Id, stored))
+        {
+            throw new InvalidOperationException($"Úkol s identifikátorem {stored.Id} již existuje.");
+        }
+
+        return Task.FromResult(stored.Clone());
+    }
+
+    /// <inheritdoc />
+    public Task<bool> UpdateAsync(TodoItem item, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!_items.TryGetValue(item.Id, out var existing))
+        {
+            return Task.FromResult(false);
+        }
+
+        return Task.FromResult(_items.TryUpdate(item.Id, item.Clone(), existing));
+    }
+
+    /// <inheritdoc />
+    public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return Task.FromResult(_items.TryRemove(id, out _));
+    }
+
+    /// <inheritdoc />
+    public Task<int> CountAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return Task.FromResult(_items.Count);
+    }
+
+    /// <summary>Vloží ukázkové úkoly, aby API hned po startu nevracelo prázdný seznam.</summary>
+    private void Seed()
+    {
+        var now = _timeProvider.GetUtcNow();
+
+        AddSeedItem("Připravit ukázkové API", "Tři projekty: DTO, Data, API.", TodoPriority.High, isCompleted: true, now.AddDays(-2));
+        AddSeedItem("Napsat Dockerfile", "Vícefázový build nad SDK a runtime image.", TodoPriority.High, isCompleted: false, now.AddDays(-1));
+        AddSeedItem("Vyzkoušet docker compose", "Spustit API ve dvou replikách.", TodoPriority.Normal, isCompleted: false, now.AddHours(-3));
+        AddSeedItem("Uklidit nepoužité image", "docker image prune", TodoPriority.Low, isCompleted: false, now.AddMinutes(-30));
+    }
+
+    private void AddSeedItem(string title, string description, TodoPriority priority, bool isCompleted, DateTimeOffset createdAtUtc)
+    {
+        var item = new TodoItem
+        {
+            Id = Guid.NewGuid(),
+            Title = title,
+            Description = description,
+            Priority = priority,
+            IsCompleted = isCompleted,
+            CreatedAtUtc = createdAtUtc,
+            CompletedAtUtc = isCompleted ? createdAtUtc.AddHours(1) : null,
+            UpdatedAtUtc = createdAtUtc
+        };
+
+        _items[item.Id] = item;
+    }
+}

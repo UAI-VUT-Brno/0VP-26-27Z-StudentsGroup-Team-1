@@ -1,0 +1,43 @@
+@UAI.ZeroVP.API_HostAddress = http://localhost:5258
+
+### Popis API ve formátu OpenAPI (Swagger UI ho čte z této adresy)
+GET {{UAI.ZeroVP.API_HostAddress}}/openapi/v1.json
+Accept: application/json
+
+### Informace o běžící instanci (v Dockeru ukáže hostname kontejneru)
+GET {{UAI.ZeroVP.API_HostAddress}}/api/info
+Accept: application/json
+
+### Kontrola zdraví – tento endpoint volá i HEALTHCHECK v Dockerfile
+GET {{UAI.ZeroVP.API_HostAddress}}/health
+
+### Všechny úkoly
+GET {{UAI.ZeroVP.API_HostAddress}}/api/todos
+Accept: application/json
+
+### Jen nedokončené úkoly
+GET {{UAI.ZeroVP.API_HostAddress}}/api/todos?isCompleted=false
+Accept: application/json
+
+### Nový úkol
+POST {{UAI.ZeroVP.API_HostAddress}}/api/todos
+Content-Type: application/json
+
+{
+  "title": "Vyzkoušet docker build",
+  "description": "Postavit image z vícefázového Dockerfile.",
+  "priority": "High"
+}
+
+### Neplatný vstup – vrátí 400 s ValidationProblemDetails
+POST {{UAI.ZeroVP.API_HostAddress}}/api/todos
+Content-Type: application/json
+
+{
+  "title": "",
+  "priority": "High"
+}
+
+### Neexistující úkol – vrátí 404 s ProblemDetails
+GET {{UAI.ZeroVP.API_HostAddress}}/api/todos/00000000-0000-0000-0000-000000000000
+Accept: application/json

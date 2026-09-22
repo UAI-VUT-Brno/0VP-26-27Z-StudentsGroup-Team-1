@@ -1,0 +1,19 @@
+# Sjednocené kódování a formátování napříč editory.
+# UTF-8 s BOM je nutnost: bez BOM dekóduje C# kompilátor na Windows
+# zdrojové soubory systémovou ANSI kódovou stránkou a diakritika se rozbije.
+root = true
+
+[*]
+charset = utf-8-bom
+end_of_line = crlf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+[*.{json,yml,yaml}]
+charset = utf-8
+indent_size = 2
+
+[*.{csproj,props,targets}]
+indent_size = 2

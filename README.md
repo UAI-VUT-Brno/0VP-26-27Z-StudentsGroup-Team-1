@@ -1,0 +1,102 @@
+# UAI.ZeroVP – ukázkové API pro výuku Dockeru
+
+Jednoduché REST API pro správu úkolů (ToDo), rozdělené do tří projektů.
+Slouží jako výchozí bod pro navazující lekce o kontejnerizaci.
+
+## Struktura solution
+
+| Projekt | Typ | Obsah | Závislosti |
+|---|---|---|---|
+| `UAI.ZeroVP.DTO` | Class library | Kontrakt API – `TodoItemDto`, `CreateTodoItemRequest`, `UpdateTodoItemRequest`, `InstanceInfoDto`, výčet `TodoPriority` | žádné |
+| `UAI.ZeroVP.Data` | Class library | Entita `TodoItem`, rozhraní `ITodoRepository`, paměťová implementace `InMemoryTodoRepository`, registrace do DI | `DTO` |
+| `UAI.ZeroVP.API` | ASP.NET Core Web API | Kontrolery, mapování entita ↔ DTO, konfigurace pipeline | `DTO`, `Data` |
+
+Závislosti tvoří jednosměrný řetěz **DTO → Data → API**. Kontroler zná jen rozhraní
+`ITodoRepository`, takže výměna paměťového úložiště za databázi se ho nedotkne.
+
+## Úložiště dat
+
+Data žijí **pouze v operační paměti procesu** (`ConcurrentDictionary`).
+Zastavením aplikace nebo kontejneru se nenávratně ztratí a každá replika má vlastní,
+na ostatních nezávislou sadu dat. To je záměr – v lekci o svazcích (volumes)
+a o stavových službách se na tento fakt přímo navazuje.
+
+Při startu se vkládají čtyři ukázkové úkoly. Vypnout je lze nastavením:
+
+```jsonc
+// appsettings.json
+"Todo": { "SeedSampleData": false }
+```
+
+nebo proměnnou prostředí `Todo__SeedSampleData=false` (dvojité podtržítko = oddělovač sekcí).
+
+## Spuštění
+
+```bash
+dotnet run --project UAI.ZeroVP.API
+```
+
+API naslouchá na `http://localhost:5258`. Kořen `/` přesměruje na Swagger UI
+(nebo na seznam úkolů, pokud je Swagger vypnutý).
+
+## Endpointy
+
+| Metoda | Cesta | Popis |
+|---|---|---|
+| `GET` | `/api/todos` | Seznam úkolů; volitelný filtr `?isCompleted=true|false` |
+| `GET` | `/api/todos/{id}` | Detail úkolu |
+| `POST` | `/api/todos` | Založení úkolu → `201 Created` + hlavička `Location` |
+| `PUT` | `/api/todos/{id}` | Úplná aktualizace úkolu |
+| `POST` | `/api/todos/{id}/complete` | Označení úkolu za dokončený |
+| `DELETE` | `/api/todos/{id}` | Smazání úkolu → `204 No Content` |
+| `GET` | `/api/info` | Hostname instance, prostředí, doba běhu, počet úkolů v paměti |
+| `GET` | `/health` | Kontrola zdraví – použije ji `HEALTHCHECK` v Dockerfile |
+| `GET` | `/swagger` | Interaktivní dokumentace Swagger UI |
+| `GET` | `/openapi/v1.json` | Popis API ve formátu OpenAPI |
+
+Chybové odpovědi mají jednotný tvar `ProblemDetails` (RFC 9457).
+Připravené požadavky k odzkoušení jsou v souboru `UAI.ZeroVP.API/UAI.ZeroVP.API.http`.
+
+## Swagger
+
+Dokument OpenAPI generuje vestavěná knihovna .NET 10 (`Microsoft.AspNetCore.OpenApi`)
+a vystavuje ho na `/openapi/v1.json`. Balíček `Swashbuckle.AspNetCore.SwaggerUI`
+nad ním přidává jen interaktivní uživatelské rozhraní na `/swagger` – druhý generátor
+dokumentu se tedy nepoužívá.
+
+Popisy operací a vlastností ve Swaggeru pocházejí z XML komentářů v kódu;
+proto mají všechny tři projekty zapnuté `<GenerateDocumentationFile>`.
+
+Swagger je zapnutý v prostředí Development a vypnutý v Production.
+Přepnout ho lze nastavením nebo proměnnou prostředí:
+
+```jsonc
+// appsettings.json
+"Swagger": { "Enabled": true }
+```
+
+```bash
+# například při spuštění kontejneru
+ASPNETCORE_ENVIRONMENT=Production Swagger__Enabled=true dotnet UAI.ZeroVP.API.dll
+```
+
+### Rychlý test
+
+```bash
+curl http://localhost:5258/api/todos
+curl -X POST http://localhost:5258/api/todos \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Napsat Dockerfile","priority":"High"}'
+curl http://localhost:5258/api/info
+```
+
+## Poznámka ke kódování
+
+Zdrojové soubory jsou uloženy jako **UTF-8 s BOM**. Bez BOM dekóduje kompilátor C#
+na Windows zdrojový kód systémovou ANSI kódovou stránkou a diakritika v řetězcích
+se rozbije. Pravidlo hlídá `.editorconfig` (`charset = utf-8-bom`).
+
+## Co dál
+
+V navazujícím kroku přibude `Dockerfile` (vícefázový build nad SDK a runtime image),
+`.dockerignore` a `compose.yaml` pro spuštění více replik.

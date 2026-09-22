@@ -1,0 +1,19 @@
+## Výstupy buildu
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+
+## Visual Studio / Rider / VS Code
+.vs/
+.idea/
+*.user
+*.suo
+.vscode/
+
+## Uživatelské nastavení aplikace
+appsettings.*.local.json
+
+## Ostatní
+*.log
