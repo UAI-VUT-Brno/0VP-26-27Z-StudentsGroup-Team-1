@@ -1,0 +1,17 @@
+# What must NOT be sent into the build context.
+# Docker reads this file because it sits next to the Dockerfile and is named
+# "<dockerfile name>.dockerignore". See case study A, example 2.
+
+**/bin/
+**/obj/
+
+.git/
+.gitignore
+.vs/
+.idea/
+.editorconfig
+
+case-study-a-dockerfile/
+case-study-b-tooling/
+case-study-c-configuration/
+*.md

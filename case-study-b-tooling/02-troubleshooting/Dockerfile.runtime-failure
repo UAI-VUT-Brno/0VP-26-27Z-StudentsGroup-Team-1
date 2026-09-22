@@ -1,0 +1,38 @@
+# ============================================================================
+#  Case study B, example 2 - BROKEN Dockerfile no. 2
+#
+#  This file CONTAINS A BUG. The build succeeds and the container starts,
+#  but the application is unreachable from outside. Find the cause.
+# ============================================================================
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+COPY UAI.ZeroVP.sln .
+COPY src/UAI.ZeroVP.DTO/UAI.ZeroVP.DTO.csproj   src/UAI.ZeroVP.DTO/
+COPY src/UAI.ZeroVP.Data/UAI.ZeroVP.Data.csproj src/UAI.ZeroVP.Data/
+COPY src/UAI.ZeroVP.API/UAI.ZeroVP.API.csproj   src/UAI.ZeroVP.API/
+RUN dotnet restore UAI.ZeroVP.sln
+
+COPY . .
+RUN dotnet publish src/UAI.ZeroVP.API/UAI.ZeroVP.API.csproj -c Release --no-restore -o /app
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+
+RUN apt-get update \
+ && apt-get install --yes --no-install-recommends curl \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=build /app .
+
+ENV ASPNETCORE_ENVIRONMENT=Production \
+    ASPNETCORE_HTTP_PORTS=5000
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=3 \
+    CMD curl --fail --silent http://localhost:8080/health || exit 1
+
+USER $APP_UID
+ENTRYPOINT ["dotnet", "UAI.ZeroVP.API.dll"]

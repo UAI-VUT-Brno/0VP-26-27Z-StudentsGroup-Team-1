@@ -1,0 +1,26 @@
+# What must NOT be sent into the build context.
+#
+# Docker looks for the ignore file next to the Dockerfile first, under the name
+# "<dockerfile name>.dockerignore", and only then in the context root as
+# ".dockerignore". That is how every example in this course gets its own rules
+# while they all share a single context.
+
+# Build output produced on the host. It does not belong in the image - the
+# image builds everything itself. It is also compiled for Windows, whereas
+# the container runs on Linux.
+**/bin/
+**/obj/
+
+# History and tooling settings.
+.git/
+.gitignore
+.vs/
+.idea/
+.editorconfig
+
+# Course material. Docker reads the Dockerfile itself separately,
+# so there is no need to ship it inside the context.
+case-study-a-dockerfile/
+case-study-b-tooling/
+case-study-c-configuration/
+*.md

@@ -1,0 +1,58 @@
+# ============================================================================
+#  Case study A, example 5 - the whole environment in one command
+#
+#  Two services:
+#    api   - our application, running as three replicas
+#    nginx - spreads incoming requests across the replicas
+#
+#  Start it:  docker compose -f case-study-a-dockerfile/05-compose/compose.yaml up -d --build
+# ============================================================================
+
+# Project name. Without it Compose derives one from the folder ("05-compose")
+# and the container names come out unreadable.
+name: zerovp-a05
+
+services:
+
+  api:
+    # "build" means the image is built here, not pulled.
+    build:
+      # The context is the repository root - hence the two levels up.
+      # Paths are relative to the location of this file.
+      context: ../..
+      dockerfile: case-study-a-dockerfile/03-hardening/Dockerfile
+    image: zerovp:a05
+
+    # No "ports" and no "container_name":
+    #   - no port outward is needed, traffic comes through nginx
+    #   - a fixed name would make it impossible to run several replicas
+    expose:
+      - "8080"
+
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+
+    deploy:
+      # Three containers running side by side from the same image.
+      replicas: 3
+
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.29-alpine
+
+    ports:
+      # The single way into the whole environment from outside.
+      - "8080:80"
+
+    volumes:
+      # The configuration is mounted from the file next to this compose.yaml.
+      # :ro = read-only, the container must not write to it.
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+
+    depends_on:
+      # Startup order: nginx after api.
+      # Careful - this waits only for the containers to START, not to be ready.
+      - api
+
+    restart: unless-stopped

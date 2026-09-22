@@ -1,0 +1,38 @@
+# ============================================================================
+#  Case study B, example 3 - a persistent cache for NuGet packages
+#
+#  The only difference from an ordinary Dockerfile is RUN --mount=type=cache.
+#  The NuGet package folder survives even "docker build --no-cache".
+# ============================================================================
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+COPY UAI.ZeroVP.sln .
+COPY src/UAI.ZeroVP.DTO/UAI.ZeroVP.DTO.csproj   src/UAI.ZeroVP.DTO/
+COPY src/UAI.ZeroVP.Data/UAI.ZeroVP.Data.csproj src/UAI.ZeroVP.Data/
+COPY src/UAI.ZeroVP.API/UAI.ZeroVP.API.csproj   src/UAI.ZeroVP.API/
+
+# --mount=type=cache attaches persistent storage that Docker manages outside
+# the image layers.
+#   - it does NOT end up in the resulting image (unlike an ordinary layer)
+#   - it survives between builds, including with --no-cache
+#   - it is shared by every build that names the same target
+RUN --mount=type=cache,target=/root/.nuget/packages \
+    dotnet restore UAI.ZeroVP.sln
+
+COPY . .
+
+RUN --mount=type=cache,target=/root/.nuget/packages \
+    dotnet publish src/UAI.ZeroVP.API/UAI.ZeroVP.API.csproj \
+        --configuration Release \
+        --no-restore \
+        --output /app
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+WORKDIR /app
+COPY --from=build /app .
+ENV ASPNETCORE_ENVIRONMENT=Production
+EXPOSE 8080
+USER $APP_UID
+ENTRYPOINT ["dotnet", "UAI.ZeroVP.API.dll"]

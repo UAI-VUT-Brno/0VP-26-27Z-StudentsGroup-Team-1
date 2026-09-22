@@ -1,0 +1,24 @@
+# ============================================================================
+#  Case study B, example 2 - BROKEN Dockerfile no. 1
+#
+#  This file CONTAINS A BUG. That is deliberate - your job is to find it.
+#  The build will fail. Read the error message and work out why.
+# ============================================================================
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+COPY UAI.ZeroVP.sln .
+COPY src/UAI.ZeroVP.DTO/UAI.ZeroVP.DTO.csproj   src/UAI.ZeroVP.DTO/
+COPY src/UAI.ZeroVP.Data/UAI.ZeroVP.Data.csproj src/UAI.ZeroVP.Data/
+COPY src/UAI.ZeroVP.API/UAI.ZeroVP.API.csproj   src/UAI.ZeroVP.API/
+RUN dotnet restore UAI.ZeroVP.sln
+
+COPY . .
+RUN dotnet publish src/UAI.ZeroVP.API/UAI.ZeroVP.API.csproj -c Release --no-restore -o /app
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+WORKDIR /app
+COPY --from=build /publish .
+EXPOSE 8080
+ENTRYPOINT ["dotnet", "UAI.ZeroVP.API.dll"]

@@ -1,0 +1,74 @@
+# ============================================================================
+#  Case study B, example 5 - the whole environment in one command
+#
+#  Three services that together make a usable development environment:
+#    api      - our application
+#    registry - the local image store from example 4
+#    nginx    - the single way in from outside
+#
+#  Start it:  cd case-study-b-tooling/05-compose && docker compose up -d --build
+# ============================================================================
+
+name: zerovp-b05
+
+services:
+
+  api:
+    build:
+      context: ../..
+      dockerfile: case-study-b-tooling/01-lifecycle/Dockerfile
+      args:
+        # Taken from the APP_VERSION environment variable; when it is not set,
+        # the value after :- is used.
+        APP_VERSION: ${APP_VERSION:-1.4.2}
+    image: zerovp:b05
+
+    expose:
+      - "8080"
+
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+
+    deploy:
+      replicas: 2
+
+    restart: unless-stopped
+
+    # docker compose watch - observes files on disk and reacts to changes.
+    # Started with "docker compose watch" instead of "up".
+    develop:
+      watch:
+        # A change in the C# source triggers an image rebuild and a service restart.
+        - path: ../../src/UAI.ZeroVP.API
+          action: rebuild
+        - path: ../../src/UAI.ZeroVP.Data
+          action: rebuild
+        - path: ../../src/UAI.ZeroVP.DTO
+          action: rebuild
+
+  registry:
+    image: registry:3
+    ports:
+      - "5555:5000"
+    volumes:
+      # A named volume - unlike the application's memory, this survives a restart.
+      - registry-data:/var/lib/registry
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.29-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      api:
+        # Unlike a plain list, this waits until the API containers pass their
+        # HEALTHCHECK - not merely until they start.
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  # A Docker-managed volume. It survives "docker compose down"
+  # and disappears only with "docker compose down --volumes".
+  registry-data:
