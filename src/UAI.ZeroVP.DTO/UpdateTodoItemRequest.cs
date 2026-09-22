@@ -3,21 +3,30 @@
 namespace UAI.ZeroVP.DTO;
 
 /// <summary>
-/// Vstup pro vytvoření nového úkolu (HTTP POST /api/todos).
-/// Validační atributy vyhodnocuje ASP.NET Core automaticky díky <c>[ApiController]</c>.
+/// Vstup pro úplnou aktualizaci úkolu (HTTP PUT /api/todos/{id}).
+/// Jde o "full update" – neposlané hodnoty se přepíší výchozími.
 /// </summary>
-public sealed record CreateTodoItemRequest
+public sealed record UpdateTodoItemRequest
 {
-    /// <summary>Krátký název úkolu. Povinný, 1–200 znaků.</summary>
+    /// <summary>
+    /// Krátký název úkolu. Povinný, 1–200 znaků.
+    /// <para>
+    /// Bez klíčového slova <c>required</c> ze stejného důvodu jako
+    /// u <see cref="CreateTodoItemRequest.Title"/>.
+    /// </para>
+    /// </summary>
     [Required(AllowEmptyStrings = false, ErrorMessage = "Název úkolu je povinný.")]
     [StringLength(200, MinimumLength = 1, ErrorMessage = "Název musí mít 1 až 200 znaků.")]
-    public required string Title { get; init; }
+    public string Title { get; init; } = string.Empty;
 
     /// <summary>Volitelný popis, maximálně 1000 znaků.</summary>
     [StringLength(1000, ErrorMessage = "Popis smí mít nejvýše 1000 znaků.")]
     public string? Description { get; init; }
 
-    /// <summary>Priorita úkolu. Výchozí hodnota je <see cref="TodoPriority.Normal"/>.</summary>
+    /// <summary>Priorita úkolu.</summary>
     [EnumDataType(typeof(TodoPriority), ErrorMessage = "Neplatná hodnota priority.")]
     public TodoPriority Priority { get; init; } = TodoPriority.Normal;
+
+    /// <summary>Příznak dokončení úkolu.</summary>
+    public bool IsCompleted { get; init; }
 }

@@ -37,13 +37,17 @@ public sealed class InfoController : ControllerBase
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
             ?? "neznámá";
 
+        // Process je IDisposable. Bez using by si každý požadavek na /api/info
+        // podržel nativní handle procesu až do příštího sběru odpadků.
+        using var process = Process.GetCurrentProcess();
+
         return Ok(new InstanceInfoDto
         {
             MachineName = Environment.MachineName,
             Environment = _environment.EnvironmentName,
             Version = version,
             UtcNow = _timeProvider.GetUtcNow(),
-            Uptime = _timeProvider.GetUtcNow() - Process.GetCurrentProcess().StartTime.ToUniversalTime(),
+            Uptime = _timeProvider.GetUtcNow() - process.StartTime.ToUniversalTime(),
             TodoCount = await _repository.CountAsync(cancellationToken)
         });
     }

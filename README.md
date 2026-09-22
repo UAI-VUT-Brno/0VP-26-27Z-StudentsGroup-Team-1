@@ -3,7 +3,22 @@
 Jednoduché REST API pro správu úkolů (ToDo), rozdělené do tří projektů.
 Slouží jako výchozí bod pro navazující lekce o kontejnerizaci.
 
-## Struktura solution
+## Struktura repozitáře
+
+```text
+UAI.ZeroVP.sln                 solution – zůstává v kořeni
+src/                           zdrojový kód aplikace
+├─ UAI.ZeroVP.DTO/             kontrakt API
+├─ UAI.ZeroVP.Data/            entita a paměťové úložiště
+└─ UAI.ZeroVP.API/             webové API, kontrolery, mapování
+case-study-a-dockerfile/       výuka – vrstvení Dockerfile
+case-study-b-tooling/          výuka – nástroje a workflow
+case-study-c-configuration/    výuka – konfigurace aplikace
+```
+
+Aplikace i výukové materiály sdílejí jeden kontext, proto se **sestavuje vždy
+z kořene repozitáře** – jak `dotnet build`, tak `docker build`. Podrobnosti
+v sekci [Výukové materiály k Dockeru](#výukové-materiály-k-dockeru).
 
 | Projekt | Typ | Obsah | Závislosti |
 |---|---|---|---|
@@ -18,8 +33,10 @@ Závislosti tvoří jednosměrný řetěz **DTO → Data → API**. Kontroler zn
 
 Data žijí **pouze v operační paměti procesu** (`ConcurrentDictionary`).
 Zastavením aplikace nebo kontejneru se nenávratně ztratí a každá replika má vlastní,
-na ostatních nezávislou sadu dat. To je záměr – v lekci o svazcích (volumes)
-a o stavových službách se na tento fakt přímo navazuje.
+na ostatních nezávislou sadu dat. To je záměr a navazuje se na něj:
+[case study A](case-study-a-dockerfile/) to ukazuje v příkladech 4 a 5 (restart
+kontejneru, replikace za nginx), [case study B](case-study-b-tooling/05-compose/)
+pak protiklad – pojmenovaný svazek, který restart přežije.
 
 Při startu se vkládají čtyři ukázkové úkoly. Vypnout je lze nastavením:
 
@@ -33,7 +50,7 @@ nebo proměnnou prostředí `Todo__SeedSampleData=false` (dvojité podtržítko 
 ## Spuštění
 
 ```bash
-dotnet run --project UAI.ZeroVP.API
+dotnet run --project src/UAI.ZeroVP.API
 ```
 
 API naslouchá na `http://localhost:5258`. Kořen `/` přesměruje na Swagger UI
@@ -43,7 +60,7 @@ API naslouchá na `http://localhost:5258`. Kořen `/` přesměruje na Swagger UI
 
 | Metoda | Cesta | Popis |
 |---|---|---|
-| `GET` | `/api/todos` | Seznam úkolů; volitelný filtr `?isCompleted=true|false` |
+| `GET` | `/api/todos` | Seznam úkolů; volitelný filtr `?isCompleted=true\|false` |
 | `GET` | `/api/todos/{id}` | Detail úkolu |
 | `POST` | `/api/todos` | Založení úkolu → `201 Created` + hlavička `Location` |
 | `PUT` | `/api/todos/{id}` | Úplná aktualizace úkolu |
@@ -55,7 +72,7 @@ API naslouchá na `http://localhost:5258`. Kořen `/` přesměruje na Swagger UI
 | `GET` | `/openapi/v1.json` | Popis API ve formátu OpenAPI |
 
 Chybové odpovědi mají jednotný tvar `ProblemDetails` (RFC 9457).
-Připravené požadavky k odzkoušení jsou v souboru `UAI.ZeroVP.API/UAI.ZeroVP.API.http`.
+Připravené požadavky k odzkoušení jsou v souboru `src/UAI.ZeroVP.API/UAI.ZeroVP.API.http`.
 
 ## Swagger
 
@@ -96,7 +113,31 @@ Zdrojové soubory jsou uloženy jako **UTF-8 s BOM**. Bez BOM dekóduje kompilá
 na Windows zdrojový kód systémovou ANSI kódovou stránkou a diakritika v řetězcích
 se rozbije. Pravidlo hlídá `.editorconfig` (`charset = utf-8-bom`).
 
-## Co dál
+## Výukové materiály k Dockeru
 
-V navazujícím kroku přibude `Dockerfile` (vícefázový build nad SDK a runtime image),
-`.dockerignore` a `compose.yaml` pro spuštění více replik.
+Nad touto aplikací jsou postavené tři nezávislé case studies, každá o pěti příkladech.
+Každý příklad má zadání pro studenta a komentované řešení. Náročnost stoupá
+od case study A k case study C.
+
+| Case study | Úroveň | Téma |
+|---|---|---|
+| [A – vrstvení Dockerfile](case-study-a-dockerfile/) | začátečníci | jeden Dockerfile, který se postupně zlepšuje: od 1,34 GB k zpevněnému image za 352 MB |
+| [B – nástroje a workflow](case-study-b-tooling/) | mírně pokročilí | životní cyklus, diagnostika rozbitých kontejnerů, vrstvy, registry |
+| [C – konfigurace aplikace](case-study-c-configuration/) | pokročilí | jeden image, mnoho prostředí: proměnné, soubory, priorita zdrojů, tajemství |
+
+Materiály case studies jsou psané **anglicky**; samotná aplikace a tento soubor zůstávají v češtině.
+
+Každá case study končí příkladem s Docker Compose. Všechny tři jsou samostatné –
+lze je probírat v libovolném pořadí nebo jen některý.
+
+### Společné pro všechny case studies
+
+Sestavuje se vždy **z kořene projektu**, Dockerfile se uvádí přepínačem `-f`:
+
+```bash
+docker build -f case-study-a-dockerfile/02-multi-stage-build/Dockerfile -t zerovp:a02 .
+```
+
+Ignorovací soubory jsou uložené vedle jednotlivých Dockerfile jako
+`<jméno Dockerfile>.dockerignore`, protože všechny příklady sdílejí jeden kontext.
+V běžném projektu patří `.dockerignore` do kořene repozitáře.

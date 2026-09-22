@@ -81,12 +81,21 @@ public sealed class InMemoryTodoRepository : ITodoRepository
         ArgumentNullException.ThrowIfNull(item);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (!_items.TryGetValue(item.Id, out var existing))
+        var replacement = item.Clone();
+
+        // TryUpdate porovná uloženou instanci s tou, kterou jsme právě přečetli.
+        // Když ji mezitím vyměnilo jiné vlákno, porovnání selže a čte se znovu.
+        // Bez toho cyklu by souběžný zápis vrátil false, tedy 404 "úkol nenalezen",
+        // přestože úkol existuje. Vyhrává poslední zapisující.
+        while (_items.TryGetValue(item.Id, out var existing))
         {
-            return Task.FromResult(false);
+            if (_items.TryUpdate(item.Id, replacement, existing))
+            {
+                return Task.FromResult(true);
+            }
         }
 
-        return Task.FromResult(_items.TryUpdate(item.Id, item.Clone(), existing));
+        return Task.FromResult(false);
     }
 
     /// <inheritdoc />
