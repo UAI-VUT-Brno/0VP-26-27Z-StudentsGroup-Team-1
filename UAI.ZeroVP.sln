@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UAI.ZeroVP.Data", "src\UAI.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UAI.ZeroVP.API", "src\UAI.ZeroVP.API\UAI.ZeroVP.API.csproj", "{C3659BDD-7177-41CA-A5C8-737A6B4CED5F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UAI.ZeroVP.Tests", "tests\UAI.ZeroVP.Tests\UAI.ZeroVP.Tests.csproj", "{AD043D07-B4EC-4797-A3CC-E5D3BFF15ACE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -55,6 +57,18 @@ Global
 		{C3659BDD-7177-41CA-A5C8-737A6B4CED5F}.Release|x64.Build.0 = Release|Any CPU
 		{C3659BDD-7177-41CA-A5C8-737A6B4CED5F}.Release|x86.ActiveCfg = Release|Any CPU
 		{C3659BDD-7177-41CA-A5C8-737A6B4CED5F}.Release|x86.Build.0 = Release|Any CPU
+		{AD043D07-B4EC-4797-A3CC-E5D3BFF15ACE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AD043D07-B4EC-4797-A3CC-E5D3BFF15ACE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AD043D07-B4EC-4797-A3CC-E5D3BFF15ACE}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{AD043D07-B4EC-4797-A3CC-E5D3BFF15ACE}.Debug|x64.Build.0 = Debug|Any CPU
+		{AD043D07-B4EC-4797-A3CC-E5D3BFF15ACE}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{AD043D07-B4EC-4797-A3CC-E5D3BFF15ACE}.Debug|x86.Build.0 = Debug|Any CPU
+		{AD043D07-B4EC-4797-A3CC-E5D3BFF15ACE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AD043D07-B4EC-4797-A3CC-E5D3BFF15ACE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AD043D07-B4EC-4797-A3CC-E5D3BFF15ACE}.Release|x64.ActiveCfg = Release|Any CPU
+		{AD043D07-B4EC-4797-A3CC-E5D3BFF15ACE}.Release|x64.Build.0 = Release|Any CPU
+		{AD043D07-B4EC-4797-A3CC-E5D3BFF15ACE}.Release|x86.ActiveCfg = Release|Any CPU
+		{AD043D07-B4EC-4797-A3CC-E5D3BFF15ACE}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
