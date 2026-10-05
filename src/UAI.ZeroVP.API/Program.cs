@@ -2,8 +2,27 @@
 using Microsoft.OpenApi;
 using UAI.ZeroVP.Data.DependencyInjection;
 using UAI.ZeroVP.Data.InMemory;
+using Serilog;
+using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var logFilePath = Path.Combine(
+    builder.Environment.ContentRootPath,
+    "logs",
+    "uai-zerovp-.log");
+
+builder.Services.AddSerilog((services, loggerConfiguration) =>
+{
+    loggerConfiguration
+        .MinimumLevel.Information()
+        .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
+        .Enrich.FromLogContext()
+        .WriteTo.Console()
+        .WriteTo.File(
+            logFilePath,
+            rollingInterval: RollingInterval.Day);
+});
 
 // --- Služby ---------------------------------------------------------------
 
