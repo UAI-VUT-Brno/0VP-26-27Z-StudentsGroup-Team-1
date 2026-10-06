@@ -1,0 +1,300 @@
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Time.Testing;
+using UAI.ZeroVP.API.Controllers;
+using UAI.ZeroVP.Data.Abstractions;
+using UAI.ZeroVP.Data.Entities;
+using UAI.ZeroVP.Data.InMemory;
+using UAI.ZeroVP.DTO;
+
+namespace UAI.ZeroVP.Tests.API;
+
+/// <summary>
+/// Chování REST kontroleru: status kódy, obsah odpovědí a dopad na úložiště.
+/// Kontroler se volá přímo (bez HTTP) nad skutečným paměťovým repozitářem;
+/// validaci vstupu obstarává ASP.NET Core ještě před kontrolerem, viz testy DTO.
+/// </summary>
+public sealed class TodosControllerTests
+{
+    private static readonly DateTimeOffset Now = new(2026, 9, 1, 12, 0, 0, TimeSpan.Zero);
+
+    private readonly InMemoryTodoRepository _repository = new(new InMemoryTodoOptions { SeedSampleData = false });
+    private readonly FakeTimeProvider _timeProvider = new(Now);
+
+    private TodosController CreateController(ITodoRepository? repository = null) =>
+        new(repository ?? _repository, _timeProvider, NullLogger<TodosController>.Instance)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+        };
+
+    private async Task<TodoItem> AddItemAsync(
+        string title = "Úkol",
+        TodoPriority priority = TodoPriority.Normal,
+        bool isCompleted = false) =>
+        await _repository.AddAsync(new TodoItem
+        {
+            Id = Guid.NewGuid(),
+            Title = title,
+            Priority = priority,
+            IsCompleted = isCompleted,
+            CreatedAtUtc = Now.AddDays(-1),
+            CompletedAtUtc = isCompleted ? Now.AddHours(-1) : null,
+            UpdatedAtUtc = Now.AddDays(-1)
+        });
+
+    /// <summary>Ověří odpověď 200 OK a vrátí její obsah.</summary>
+    private static T AssertOk<T>(ActionResult<T> result)
+    {
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        return Assert.IsAssignableFrom<T>(ok.Value);
+    }
+
+    /// <summary>Ověří jednotnou odpověď 404 ve formátu ProblemDetails.</summary>
+    private static void AssertNotFoundProblem(IActionResult? result, Guid id)
+    {
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, objectResult.StatusCode);
+
+        var problem = Assert.IsType<ProblemDetails>(objectResult.Value);
+        Assert.Equal(StatusCodes.Status404NotFound, problem.Status);
+        Assert.Contains(id.ToString(), problem.Detail);
+    }
+
+    // --- GET /api/todos -----------------------------------------------------
+
+    [Fact]
+    public async Task GetAll_ReturnsOkWithAllItemsAsDtos()
+    {
+        await AddItemAsync("Low", TodoPriority.Low);
+        await AddItemAsync("High", TodoPriority.High);
+
+        var items = AssertOk(await CreateController().GetAll(isCompleted: null, CancellationToken.None));
+
+        Assert.Equal(["High", "Low"], items.Select(item => item.Title));
+    }
+
+    [Fact]
+    public async Task GetAll_EmptyRepository_ReturnsOkWithEmptyList()
+    {
+        var items = AssertOk(await CreateController().GetAll(isCompleted: null, CancellationToken.None));
+
+        Assert.Empty(items);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task GetAll_CompletionFilter_IsPassedToRepository(bool isCompleted)
+    {
+        await AddItemAsync("Hotový", isCompleted: true);
+        await AddItemAsync("Rozdělaný", isCompleted: false);
+
+        var items = AssertOk(await CreateController().GetAll(isCompleted, CancellationToken.None));
+
+        Assert.Equal(isCompleted, Assert.Single(items).IsCompleted);
+    }
+
+    // --- GET /api/todos/{id} ------------------------------------------------
+
+    [Fact]
+    public async Task GetById_ExistingItem_ReturnsOkWithDto()
+    {
+        var item = await AddItemAsync("Napsat Dockerfile");
+
+        var dto = AssertOk(await CreateController().GetById(item.Id, CancellationToken.None));
+
+        Assert.Equal(item.Id, dto.Id);
+        Assert.Equal("Napsat Dockerfile", dto.Title);
+    }
+
+    [Fact]
+    public async Task GetById_UnknownId_ReturnsNotFoundProblem()
+    {
+        var id = Guid.NewGuid();
+
+        var result = await CreateController().GetById(id, CancellationToken.None);
+
+        AssertNotFoundProblem(result.Result, id);
+    }
+
+    // --- POST /api/todos ----------------------------------------------------
+
+    [Fact]
+    public async Task Create_ReturnsCreatedWithRouteToNewItem()
+    {
+        var request = new CreateTodoItemRequest { Title = "Nový úkol", Priority = TodoPriority.High };
+
+        var result = await CreateController().Create(request, CancellationToken.None);
+
+        // Z CreatedAtRoute sestaví ASP.NET Core hlavičku Location: /api/todos/{id}.
+        var created = Assert.IsType<CreatedAtRouteResult>(result.Result);
+        var dto = Assert.IsType<TodoItemDto>(created.Value);
+        Assert.Equal(nameof(TodosController.GetById), created.RouteName);
+        Assert.Equal(dto.Id, created.RouteValues!["id"]);
+        Assert.Equal("Nový úkol", dto.Title);
+        Assert.Equal(TodoPriority.High, dto.Priority);
+    }
+
+    [Fact]
+    public async Task Create_StoresItemStampedWithCurrentTime()
+    {
+        var request = new CreateTodoItemRequest { Title = "  Nový úkol  " };
+
+        var result = await CreateController().Create(request, CancellationToken.None);
+
+        var dto = Assert.IsType<TodoItemDto>(Assert.IsType<CreatedAtRouteResult>(result.Result).Value);
+        var stored = await _repository.GetByIdAsync(dto.Id);
+        Assert.NotNull(stored);
+        Assert.Equal("Nový úkol", stored.Title);
+        Assert.Equal(Now, stored.CreatedAtUtc);
+        Assert.False(stored.IsCompleted);
+    }
+
+    // --- PUT /api/todos/{id} ------------------------------------------------
+
+    [Fact]
+    public async Task Update_ExistingItem_ReturnsOkAndStoresChanges()
+    {
+        var item = await AddItemAsync("Původní");
+        var request = new UpdateTodoItemRequest { Title = "Nový název", Priority = TodoPriority.High };
+
+        var dto = AssertOk(await CreateController().Update(item.Id, request, CancellationToken.None));
+
+        Assert.Equal("Nový název", dto.Title);
+        var stored = await _repository.GetByIdAsync(item.Id);
+        Assert.Equal("Nový název", stored!.Title);
+        Assert.Equal(TodoPriority.High, stored.Priority);
+        Assert.Equal(Now, stored.UpdatedAtUtc);
+    }
+
+    [Fact]
+    public async Task Update_MarkAsCompleted_SetsCompletionTime()
+    {
+        var item = await AddItemAsync();
+        var request = new UpdateTodoItemRequest { Title = "Úkol", IsCompleted = true };
+
+        var dto = AssertOk(await CreateController().Update(item.Id, request, CancellationToken.None));
+
+        Assert.True(dto.IsCompleted);
+        Assert.Equal(Now, dto.CompletedAtUtc);
+    }
+
+    [Fact]
+    public async Task Update_UnknownId_ReturnsNotFoundAndDoesNotCreateItem()
+    {
+        var id = Guid.NewGuid();
+
+        var result = await CreateController().Update(id, new UpdateTodoItemRequest { Title = "Úkol" }, CancellationToken.None);
+
+        AssertNotFoundProblem(result.Result, id);
+        Assert.Equal(0, await _repository.CountAsync());
+    }
+
+    [Fact]
+    public async Task Update_ItemDeletedMeanwhile_ReturnsNotFound()
+    {
+        var item = await AddItemAsync();
+        var controller = CreateController(new DeletedBeforeUpdateRepository(_repository));
+
+        var result = await controller.Update(item.Id, new UpdateTodoItemRequest { Title = "Úkol" }, CancellationToken.None);
+
+        AssertNotFoundProblem(result.Result, item.Id);
+    }
+
+    // --- POST /api/todos/{id}/complete --------------------------------------
+
+    [Fact]
+    public async Task Complete_OpenItem_ReturnsOkWithCompletionTime()
+    {
+        var item = await AddItemAsync(isCompleted: false);
+
+        var dto = AssertOk(await CreateController().Complete(item.Id, CancellationToken.None));
+
+        Assert.True(dto.IsCompleted);
+        Assert.Equal(Now, dto.CompletedAtUtc);
+        Assert.True((await _repository.GetByIdAsync(item.Id))!.IsCompleted);
+    }
+
+    [Fact]
+    public async Task Complete_AlreadyCompletedItem_KeepsOriginalCompletionTime()
+    {
+        var item = await AddItemAsync(isCompleted: true);
+
+        var dto = AssertOk(await CreateController().Complete(item.Id, CancellationToken.None));
+
+        Assert.Equal(item.CompletedAtUtc, dto.CompletedAtUtc);
+    }
+
+    [Fact]
+    public async Task Complete_UnknownId_ReturnsNotFoundProblem()
+    {
+        var id = Guid.NewGuid();
+
+        var result = await CreateController().Complete(id, CancellationToken.None);
+
+        AssertNotFoundProblem(result.Result, id);
+    }
+
+    [Fact]
+    public async Task Complete_ItemDeletedMeanwhile_ReturnsNotFound()
+    {
+        var item = await AddItemAsync();
+        var controller = CreateController(new DeletedBeforeUpdateRepository(_repository));
+
+        var result = await controller.Complete(item.Id, CancellationToken.None);
+
+        AssertNotFoundProblem(result.Result, item.Id);
+    }
+
+    // --- DELETE /api/todos/{id} ---------------------------------------------
+
+    [Fact]
+    public async Task Delete_ExistingItem_ReturnsNoContentAndRemovesIt()
+    {
+        var item = await AddItemAsync();
+
+        var result = await CreateController().Delete(item.Id, CancellationToken.None);
+
+        Assert.IsType<NoContentResult>(result);
+        Assert.Null(await _repository.GetByIdAsync(item.Id));
+    }
+
+    [Fact]
+    public async Task Delete_UnknownId_ReturnsNotFoundProblem()
+    {
+        var id = Guid.NewGuid();
+
+        var result = await CreateController().Delete(id, CancellationToken.None);
+
+        AssertNotFoundProblem(result, id);
+    }
+
+    /// <summary>
+    /// Napodobí souběh: úkol mezi načtením a uložením smaže jiný požadavek.
+    /// Kontroler ho načte, ale <c>UpdateAsync</c> už vrátí <c>false</c>.
+    /// </summary>
+    private sealed class DeletedBeforeUpdateRepository(ITodoRepository inner) : ITodoRepository
+    {
+        public Task<IReadOnlyList<TodoItem>> GetAllAsync(bool? isCompleted = null, CancellationToken cancellationToken = default) =>
+            inner.GetAllAsync(isCompleted, cancellationToken);
+
+        public Task<TodoItem?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+            inner.GetByIdAsync(id, cancellationToken);
+
+        public Task<TodoItem> AddAsync(TodoItem item, CancellationToken cancellationToken = default) =>
+            inner.AddAsync(item, cancellationToken);
+
+        public async Task<bool> UpdateAsync(TodoItem item, CancellationToken cancellationToken = default)
+        {
+            await inner.DeleteAsync(item.Id, cancellationToken);
+            return await inner.UpdateAsync(item, cancellationToken);
+        }
+
+        public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default) =>
+            inner.DeleteAsync(id, cancellationToken);
+
+        public Task<int> CountAsync(CancellationToken cancellationToken = default) =>
+            inner.CountAsync(cancellationToken);
+    }
+}
