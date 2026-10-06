@@ -21,7 +21,9 @@ builder.Services.AddSerilog((services, loggerConfiguration) =>
         .WriteTo.Console()
         .WriteTo.File(
             logFilePath,
-            rollingInterval: RollingInterval.Day);
+            rollingInterval: RollingInterval.Day,
+            outputTemplate:
+                "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}");
 });
 
 // --- Služby ---------------------------------------------------------------
