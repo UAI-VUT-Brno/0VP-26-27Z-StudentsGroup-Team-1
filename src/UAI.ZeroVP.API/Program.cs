@@ -79,6 +79,8 @@ var swaggerEnabled = app.Configuration.GetValue("Swagger:Enabled", app.Environme
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 
+app.UseSerilogRequestLogging();
+
 if (swaggerEnabled)
 {
     // Strojově čitelný popis API.
