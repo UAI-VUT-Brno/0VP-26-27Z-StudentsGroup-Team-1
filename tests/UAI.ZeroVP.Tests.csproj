@@ -17,9 +17,9 @@
 
   <!-- Jeden testovací projekt pro celé řešení; složky DTO/, Data/, API/ kopírují strukturu src. -->
   <ItemGroup>
-    <ProjectReference Include="..\..\src\UAI.ZeroVP.DTO\UAI.ZeroVP.DTO.csproj" />
-    <ProjectReference Include="..\..\src\UAI.ZeroVP.Data\UAI.ZeroVP.Data.csproj" />
-    <ProjectReference Include="..\..\src\UAI.ZeroVP.API\UAI.ZeroVP.API.csproj" />
+    <ProjectReference Include="..\src\UAI.ZeroVP.DTO\UAI.ZeroVP.DTO.csproj" />
+    <ProjectReference Include="..\src\UAI.ZeroVP.Data\UAI.ZeroVP.Data.csproj" />
+    <ProjectReference Include="..\src\UAI.ZeroVP.API\UAI.ZeroVP.API.csproj" />
   </ItemGroup>
 
   <ItemGroup>
