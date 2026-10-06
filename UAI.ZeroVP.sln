@@ -9,7 +9,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UAI.ZeroVP.Data", "src\UAI.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UAI.ZeroVP.API", "src\UAI.ZeroVP.API\UAI.ZeroVP.API.csproj", "{C3659BDD-7177-41CA-A5C8-737A6B4CED5F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UAI.ZeroVP.Tests", "tests\UAI.ZeroVP.Tests\UAI.ZeroVP.Tests.csproj", "{AD043D07-B4EC-4797-A3CC-E5D3BFF15ACE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UAI.ZeroVP.Tests", "tests\UAI.ZeroVP.Tests.csproj", "{AD043D07-B4EC-4797-A3CC-E5D3BFF15ACE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
