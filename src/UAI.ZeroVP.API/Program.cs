@@ -70,6 +70,18 @@ builder.Services.AddOpenApi(options =>
 
 var app = builder.Build();
 
+app.Lifetime.ApplicationStarted.Register(() =>
+    app.Logger.LogInformation(
+        "Application lifecycle event {Event} completed with result {Result}.",
+        "Start",
+        "Success"));
+
+app.Lifetime.ApplicationStopped.Register(() =>
+    app.Logger.LogInformation(
+        "Application lifecycle event {Event} completed with result {Result}.",
+        "Stop",
+        "Success"));
+
 // Swagger UI je ve vývoji zapnutý; v kontejneru (prostředí Production) se dá
 // zapnout proměnnou prostředí Swagger__Enabled=true.
 var swaggerEnabled = app.Configuration.GetValue("Swagger:Enabled", app.Environment.IsDevelopment());
