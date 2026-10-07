@@ -6,19 +6,54 @@ The API uses Serilog for persistent application logging.
 
 Application logs are written both to the console and to log files.
 
-The log files are stored in the `logs/` directory under the application content root.
+The log file path is configurable using the `PersistentLogging:FilePath` setting.
 
-When the API is run locally from this repository, the path is:
+The default value in `appsettings.json` is:
+
+`logs/uai-zerovp-.log`
+
+Relative paths are resolved from the application content root.
+
+When the API is run locally from this repository with the default configuration, the logs are therefore stored in:
 
 `src/UAI.ZeroVP.API/logs/`
 
-The file name uses daily rolling, for example:
+The file sink uses daily rolling. For example:
 
-`uai-zerovp-20261006.log`
+`uai-zerovp-20261008.log`
 
-A new log file is therefore used for each day.
+A new log file is used for each day.
 
 Generated `.log` files are ignored by Git and are not stored in the repository.
+
+### Configuring the log path
+
+The path can be changed in configuration using:
+
+`PersistentLogging:FilePath`
+
+It can also be overridden using an environment variable:
+
+`PersistentLogging__FilePath`
+
+For example:
+
+`PersistentLogging__FilePath=/logs/uai-zerovp-.log`
+
+This is useful when running the application in Docker.
+
+### Docker persistence
+
+Files written only inside a container are removed when the container is removed.
+
+To keep log files outside the lifetime of the container, configure the log path to point to a mounted volume.
+
+For example, the following options can be added to an existing `docker run` command:
+
+    -e PersistentLogging__FilePath=/logs/uai-zerovp-.log
+    -v uai-zerovp-logs:/logs
+
+This stores the log files in the `uai-zerovp-logs` Docker volume instead of only in the container filesystem.
 
 ## Log contents
 
@@ -36,6 +71,8 @@ HTTP API requests are logged with the HTTP method, request path, response status
 The HTTP response status code represents the result of an API request.
 
 Successful requests are logged as `Information`, client errors (`4xx`) as `Warning`, and server errors (`5xx`) or unhandled exceptions as `Error`.
+
+Successful `/health` requests are logged at `Verbose` level so that frequent Docker health checks do not fill the persistent log. Failed health requests are still logged according to their HTTP status.
 
 Application start and stop are logged explicitly as lifecycle events with the result `Success`.
 
