@@ -110,6 +110,11 @@ app.UseSerilogRequestLogging(options =>
             return LogEventLevel.Warning;
         }
 
+        if (httpContext.Request.Path.StartsWithSegments("/health"))
+        {
+            return LogEventLevel.Verbose;
+        }
+
         return LogEventLevel.Information;
     };
 });
