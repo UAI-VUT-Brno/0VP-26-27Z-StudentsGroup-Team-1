@@ -7,10 +7,13 @@ using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var logFilePath = Path.Combine(
-    builder.Environment.ContentRootPath,
-    "logs",
-    "uai-zerovp-.log");
+var configuredLogFilePath =
+    builder.Configuration["PersistentLogging:FilePath"]
+    ?? "logs/uai-zerovp-.log";
+
+var logFilePath = Path.IsPathRooted(configuredLogFilePath)
+    ? configuredLogFilePath
+    : Path.Combine(builder.Environment.ContentRootPath, configuredLogFilePath);
 
 builder.Services.AddSerilog((services, loggerConfiguration) =>
 {
