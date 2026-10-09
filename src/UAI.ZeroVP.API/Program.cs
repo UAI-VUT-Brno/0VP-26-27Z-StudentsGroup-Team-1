@@ -2,8 +2,32 @@
 using Microsoft.OpenApi;
 using UAI.ZeroVP.Data.DependencyInjection;
 using UAI.ZeroVP.Data.InMemory;
+using Serilog;
+using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var configuredLogFilePath =
+    builder.Configuration["PersistentLogging:FilePath"]
+    ?? "logs/uai-zerovp-.log";
+
+var logFilePath = Path.IsPathRooted(configuredLogFilePath)
+    ? configuredLogFilePath
+    : Path.Combine(builder.Environment.ContentRootPath, configuredLogFilePath);
+
+builder.Services.AddSerilog((services, loggerConfiguration) =>
+{
+    loggerConfiguration
+        .MinimumLevel.Information()
+        .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
+        .Enrich.FromLogContext()
+        .WriteTo.Console()
+        .WriteTo.File(
+            logFilePath,
+            rollingInterval: RollingInterval.Day,
+            outputTemplate:
+                "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}");
+});
 
 // --- Služby ---------------------------------------------------------------
 
@@ -49,6 +73,18 @@ builder.Services.AddOpenApi(options =>
 
 var app = builder.Build();
 
+app.Lifetime.ApplicationStarted.Register(() =>
+    app.Logger.LogInformation(
+        "Application lifecycle event {Event} completed with result {Result}.",
+        "Start",
+        "Success"));
+
+app.Lifetime.ApplicationStopped.Register(() =>
+    app.Logger.LogInformation(
+        "Application lifecycle event {Event} completed with result {Result}.",
+        "Stop",
+        "Success"));
+
 // Swagger UI je ve vývoji zapnutý; v kontejneru (prostředí Production) se dá
 // zapnout proměnnou prostředí Swagger__Enabled=true.
 var swaggerEnabled = app.Configuration.GetValue("Swagger:Enabled", app.Environment.IsDevelopment());
@@ -59,6 +95,29 @@ var swaggerEnabled = app.Configuration.GetValue("Swagger:Enabled", app.Environme
 // a TLS řeší až reverzní proxy před ním.
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+
+app.UseSerilogRequestLogging(options =>
+{
+    options.GetLevel = (httpContext, _, exception) =>
+    {
+        if (exception is not null || httpContext.Response.StatusCode >= 500)
+        {
+            return LogEventLevel.Error;
+        }
+
+        if (httpContext.Response.StatusCode >= 400)
+        {
+            return LogEventLevel.Warning;
+        }
+
+        if (httpContext.Request.Path.StartsWithSegments("/health"))
+        {
+            return LogEventLevel.Verbose;
+        }
+
+        return LogEventLevel.Information;
+    };
+});
 
 if (swaggerEnabled)
 {
