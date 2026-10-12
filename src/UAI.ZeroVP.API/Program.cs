@@ -15,6 +15,9 @@ var logFilePath = Path.IsPathRooted(configuredLogFilePath)
     ? configuredLogFilePath
     : Path.Combine(builder.Environment.ContentRootPath, configuredLogFilePath);
 
+// Limit doby odezvy API. Pomalejší požadavky se v logu zvýrazní jako Warning.
+var responseTimeBudgetMs = builder.Configuration.GetValue("Performance:ResponseTimeBudgetMs", 500.0);
+
 builder.Services.AddSerilog((services, loggerConfiguration) =>
 {
     loggerConfiguration
@@ -98,7 +101,7 @@ app.UseStatusCodePages();
 
 app.UseSerilogRequestLogging(options =>
 {
-    options.GetLevel = (httpContext, _, exception) =>
+    options.GetLevel = (httpContext, elapsedMs, exception) =>
     {
         if (exception is not null || httpContext.Response.StatusCode >= 500)
         {
@@ -106,6 +109,12 @@ app.UseSerilogRequestLogging(options =>
         }
 
         if (httpContext.Response.StatusCode >= 400)
+        {
+            return LogEventLevel.Warning;
+        }
+
+                // Úspěšný, ale pomalý požadavek – i zdravotní kontrola, pomalá /health je také problém.
+        if (elapsedMs > responseTimeBudgetMs)
         {
             return LogEventLevel.Warning;
         }
