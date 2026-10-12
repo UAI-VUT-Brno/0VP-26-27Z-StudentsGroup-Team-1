@@ -24,12 +24,16 @@ builder.Services.AddSerilog((services, loggerConfiguration) =>
         .MinimumLevel.Information()
         .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
         .Enrich.FromLogContext()
-        .WriteTo.Console()
-        .WriteTo.File(
-            logFilePath,
-            rollingInterval: RollingInterval.Day,
-            outputTemplate:
-                "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}");
+        // Zápis do konzole a souboru běží na pozadí – požadavek nečeká na disk ani na terminál.
+        .WriteTo.Async(sinks =>
+        {
+            sinks.Console();
+            sinks.File(
+                logFilePath,
+                rollingInterval: RollingInterval.Day,
+                outputTemplate:
+                    "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}");
+        });
 });
 
 // --- Služby ---------------------------------------------------------------
