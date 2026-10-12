@@ -155,6 +155,12 @@ This was checked explicitly:
 - One run of the load tests produces 8 009 request log entries. All 8 009 were found in the log file,
   the same number as with synchronous sinks, so no events were lost under load.
 
+### Trade-offs
+
+- On a normal shutdown the queue is flushed. On a hard kill or crash, the last queued events may be lost.
+- The queue holds 10 000 events by default. When it is full, new events are dropped instead of slowing requests down.
+- Log lines appear in the file a few milliseconds later than with synchronous sinks.
+
 ## Considered and not changed
 
 - **Caching data in `GET /api/info`.** The endpoint reads the assembly version and process start time
