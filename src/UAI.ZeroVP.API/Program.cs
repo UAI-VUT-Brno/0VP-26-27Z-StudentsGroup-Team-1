@@ -15,18 +15,25 @@ var logFilePath = Path.IsPathRooted(configuredLogFilePath)
     ? configuredLogFilePath
     : Path.Combine(builder.Environment.ContentRootPath, configuredLogFilePath);
 
+// Limit doby odezvy API. Pomalejší požadavky se v logu zvýrazní jako Warning.
+var responseTimeBudgetMs = builder.Configuration.GetValue("Performance:ResponseTimeBudgetMs", 500.0);
+
 builder.Services.AddSerilog((services, loggerConfiguration) =>
 {
     loggerConfiguration
         .MinimumLevel.Information()
         .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
         .Enrich.FromLogContext()
-        .WriteTo.Console()
-        .WriteTo.File(
-            logFilePath,
-            rollingInterval: RollingInterval.Day,
-            outputTemplate:
-                "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}");
+        // Zápis do konzole a souboru běží na pozadí – požadavek nečeká na disk ani na terminál.
+        .WriteTo.Async(sinks =>
+        {
+            sinks.Console();
+            sinks.File(
+                logFilePath,
+                rollingInterval: RollingInterval.Day,
+                outputTemplate:
+                    "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}");
+        });
 });
 
 // --- Služby ---------------------------------------------------------------
@@ -98,7 +105,7 @@ app.UseStatusCodePages();
 
 app.UseSerilogRequestLogging(options =>
 {
-    options.GetLevel = (httpContext, _, exception) =>
+    options.GetLevel = (httpContext, elapsedMs, exception) =>
     {
         if (exception is not null || httpContext.Response.StatusCode >= 500)
         {
@@ -106,6 +113,12 @@ app.UseSerilogRequestLogging(options =>
         }
 
         if (httpContext.Response.StatusCode >= 400)
+        {
+            return LogEventLevel.Warning;
+        }
+
+        // Úspěšný, ale pomalý požadavek – i zdravotní kontrola, pomalá /health je také problém.
+        if (elapsedMs > responseTimeBudgetMs)
         {
             return LogEventLevel.Warning;
         }
