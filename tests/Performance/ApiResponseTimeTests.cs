@@ -37,7 +37,7 @@ public sealed class ApiResponseTimeTests : IClassFixture<PerformanceApiFactory>
         _responseTimeBudgetMs = factory.Services.GetRequiredService<IConfiguration>().GetValue<double>("Performance:ResponseTimeBudgetMs");
     }
     
-    [Fact]
+    [PerformanceFact]
     public async Task ReadEndpoints_UnderConcurrentLoad_StayWithinBudget()
     {
         var id = await GetAnyTodoIdAsync();
@@ -47,7 +47,7 @@ public sealed class ApiResponseTimeTests : IClassFixture<PerformanceApiFactory>
         AssertWithinBudget(samples);
     }
 
-    [Fact]
+    [PerformanceFact]
     public async Task WriteEndpoints_UnderConcurrentLoad_StayWithinBudget()
     {
         var samples = await RunWithWarmUpAsync(WriteScenarioAsync);
