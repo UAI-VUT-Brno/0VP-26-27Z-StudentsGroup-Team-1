@@ -57,7 +57,9 @@ internal static class LoadRunner
     {
         var samples = new ConcurrentBag<RequestSample>();
         var timedClient = new TimedHttpClient(client, samples);
-
+        // Task.Run spustí každého uživatele samostatně na thread poolu, takže všichni začnou současně.
+        // Volá se jednou na uživatele (50×), ne na požadavek, a mimo měřený úsek – doba odezvy
+        // se tím nezkresluje. Měření bez Task.Run dalo stejné výsledky.
         var userTasks = Enumerable.Range(0, users).Select(_ => Task.Run(async () =>
         {
             for (var iteration = 0; iteration < iterationsPerUser; iteration++)
