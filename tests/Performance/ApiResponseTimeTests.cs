@@ -22,7 +22,7 @@ namespace UAI.ZeroVP.Tests.Performance;
 /// </summary>
 [Collection(PerformanceCollection.Name)]
 [Trait("Category", "Performance")]
-public sealed class ApiResponseTimeTests : IClassFixture<WebApplicationFactory<Program>>
+public sealed class ApiResponseTimeTests : IClassFixture<PerformanceApiFactory>
 {
     private const int ConcurrentUsers = 50;
     private const int IterationsPerUser = 20;
@@ -30,7 +30,7 @@ public sealed class ApiResponseTimeTests : IClassFixture<WebApplicationFactory<P
     private readonly HttpClient _client;
     private readonly ITestOutputHelper _output;
     private readonly double _responseTimeBudgetMs;
-    public ApiResponseTimeTests(WebApplicationFactory<Program> factory, ITestOutputHelper output)
+    public ApiResponseTimeTests(PerformanceApiFactory factory, ITestOutputHelper output)
     {
         _client = factory.CreateClient();
         _output = output;
