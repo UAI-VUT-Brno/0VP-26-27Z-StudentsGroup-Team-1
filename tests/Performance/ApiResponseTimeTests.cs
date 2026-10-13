@@ -2,6 +2,8 @@
 using Microsoft.AspNetCore.Mvc.Testing;
 using UAI.ZeroVP.DTO;
 using Xunit.Abstractions;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace UAI.ZeroVP.Tests.Performance;
 
@@ -22,19 +24,19 @@ namespace UAI.ZeroVP.Tests.Performance;
 [Trait("Category", "Performance")]
 public sealed class ApiResponseTimeTests : IClassFixture<WebApplicationFactory<Program>>
 {
-    private const double ResponseTimeBudgetMs = 500;
     private const int ConcurrentUsers = 50;
     private const int IterationsPerUser = 20;
 
     private readonly HttpClient _client;
     private readonly ITestOutputHelper _output;
-
+    private readonly double _responseTimeBudgetMs;
     public ApiResponseTimeTests(WebApplicationFactory<Program> factory, ITestOutputHelper output)
     {
         _client = factory.CreateClient();
         _output = output;
+        _responseTimeBudgetMs = factory.Services.GetRequiredService<IConfiguration>().GetValue<double>("Performance:ResponseTimeBudgetMs");
     }
-
+    
     [Fact]
     public async Task ReadEndpoints_UnderConcurrentLoad_StayWithinBudget()
     {
@@ -103,13 +105,13 @@ public sealed class ApiResponseTimeTests : IClassFixture<WebApplicationFactory<P
     {
         var statistics = EndpointStatistics.From(samples);
 
-        _output.WriteLine($"{ConcurrentUsers} souběžných uživatelů × {IterationsPerUser} opakování, limit {ResponseTimeBudgetMs} ms (p99)");
+        _output.WriteLine($"{ConcurrentUsers} souběžných uživatelů × {IterationsPerUser} opakování, limit {_responseTimeBudgetMs} ms (p99)");
         foreach (var endpoint in statistics)
         {
             _output.WriteLine(endpoint.ToString());
         }
 
-        foreach (var endpoint in statistics.Where(endpoint => endpoint.MaxMs > ResponseTimeBudgetMs))
+        foreach (var endpoint in statistics.Where(endpoint => endpoint.MaxMs > _responseTimeBudgetMs))
         {
             _output.WriteLine($"Upozornění: {endpoint.Endpoint} – nejpomalejší odpověď {endpoint.MaxMs:F1} ms překročila limit.");
         }
@@ -118,7 +120,7 @@ public sealed class ApiResponseTimeTests : IClassFixture<WebApplicationFactory<P
             Assert.True((int)sample.StatusCode < 400, $"{sample.Endpoint} vrátil chybu {(int)sample.StatusCode}."));
 
         Assert.All(statistics, endpoint =>
-            Assert.True(endpoint.P99Ms <= ResponseTimeBudgetMs,
-                $"{endpoint.Endpoint}: 99. percentil {endpoint.P99Ms:F1} ms překročil limit {ResponseTimeBudgetMs} ms."));
+            Assert.True(endpoint.P99Ms <= _responseTimeBudgetMs,
+                $"{endpoint.Endpoint}: 99. percentil {endpoint.P99Ms:F1} ms překročil limit {_responseTimeBudgetMs} ms."));
     }
 }
