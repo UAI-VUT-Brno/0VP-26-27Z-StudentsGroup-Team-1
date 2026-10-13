@@ -117,7 +117,7 @@ app.UseSerilogRequestLogging(options =>
             return LogEventLevel.Warning;
         }
 
-                // Úspěšný, ale pomalý požadavek – i zdravotní kontrola, pomalá /health je také problém.
+        // Úspěšný, ale pomalý požadavek – i zdravotní kontrola, pomalá /health je také problém.
         if (elapsedMs > responseTimeBudgetMs)
         {
             return LogEventLevel.Warning;
