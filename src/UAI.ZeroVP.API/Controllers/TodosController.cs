@@ -13,6 +13,8 @@ namespace UAI.ZeroVP.API.Controllers;
 [ApiController]
 [Route("api/todos")]
 [Produces("application/json")]
+[ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status500InternalServerError, "application/problem+json",
+    Description = "Neočekávaná chyba serveru.")]
 public sealed class TodosController : ControllerBase
 {
     private readonly ITodoRepository _repository;
@@ -28,11 +30,14 @@ public sealed class TodosController : ControllerBase
     }
 
     /// <summary>Vrátí seznam úkolů, volitelně filtrovaný podle stavu dokončení.</summary>
+    /// <remarks>Úkoly jsou seřazené od nejvyšší priority; při shodné prioritě od nejstaršího.</remarks>
     /// <param name="isCompleted">Filtr <c>true</c>/<c>false</c>; vynechání znamená bez filtru.</param>
     /// <param name="cancellationToken">Token pro zrušení operace.</param>
     /// <response code="200">Seznam úkolů seřazený podle priority a data vzniku.</response>
+    /// <response code="400">Parametr <c>isCompleted</c> nemá hodnotu <c>true</c> ani <c>false</c>.</response>
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyList<TodoItemDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<IReadOnlyList<TodoItemDto>>> GetAll(
         [FromQuery] bool? isCompleted,
         CancellationToken cancellationToken)
@@ -43,6 +48,8 @@ public sealed class TodosController : ControllerBase
     }
 
     /// <summary>Vrátí jeden úkol podle identifikátoru.</summary>
+    /// <param name="id">Identifikátor úkolu.</param>
+    /// <param name="cancellationToken">Token pro zrušení operace.</param>
     /// <response code="200">Nalezený úkol.</response>
     /// <response code="404">Úkol se zadaným identifikátorem neexistuje.</response>
     [HttpGet("{id:guid}", Name = nameof(GetById))]
@@ -56,11 +63,15 @@ public sealed class TodosController : ControllerBase
     }
 
     /// <summary>Založí nový úkol.</summary>
+    /// <param name="cancellationToken">Token pro zrušení operace.</param>
+    /// <param name="request">Údaje nového úkolu.</param>
     /// <response code="201">Úkol byl vytvořen; hlavička <c>Location</c> odkazuje na nový zdroj.</response>
-    /// <response code="400">Vstupní data neprošla validací.</response>
+    /// <response code="400">Tělo požadavku není platný JSON nebo neprošlo validací.</response>
+    /// <response code="415">Tělo požadavku není ve formátu JSON (chybí hlavička <c>Content-Type: application/json</c>).</response>
     [HttpPost]
     [ProducesResponseType(typeof(TodoItemDto), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status415UnsupportedMediaType)]
     public async Task<ActionResult<TodoItemDto>> Create(
         [FromBody] CreateTodoItemRequest request,
         CancellationToken cancellationToken)
@@ -74,13 +85,22 @@ public sealed class TodosController : ControllerBase
     }
 
     /// <summary>Přepíše existující úkol novými hodnotami.</summary>
+    /// <remarks>
+    /// Jde o úplnou aktualizaci: hodnota, která v těle chybí, se nastaví na výchozí
+    /// (<c>description</c> na <c>null</c>, <c>priority</c> na <c>Normal</c>, <c>isCompleted</c> na <c>false</c>).
+    /// </remarks>
+    /// <param name="id">Identifikátor úkolu.</param>
+    /// <param name="cancellationToken">Token pro zrušení operace.</param>
+    /// <param name="request">Nové hodnoty úkolu.</param>
     /// <response code="200">Aktualizovaný úkol.</response>
-    /// <response code="400">Vstupní data neprošla validací.</response>
+    /// <response code="400">Tělo požadavku není platný JSON nebo neprošlo validací.</response>
     /// <response code="404">Úkol se zadaným identifikátorem neexistuje.</response>
+    /// <response code="415">Tělo požadavku není ve formátu JSON (chybí hlavička <c>Content-Type: application/json</c>).</response>
     [HttpPut("{id:guid}")]
     [ProducesResponseType(typeof(TodoItemDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status415UnsupportedMediaType)]
     public async Task<ActionResult<TodoItemDto>> Update(
         Guid id,
         [FromBody] UpdateTodoItemRequest request,
@@ -100,6 +120,9 @@ public sealed class TodosController : ControllerBase
     }
 
     /// <summary>Označí úkol za dokončený.</summary>
+    /// <remarks>U už dokončeného úkolu se nic nezmění; <c>completedAtUtc</c> zůstane původní.</remarks>
+    /// <param name="id">Identifikátor úkolu.</param>
+    /// <param name="cancellationToken">Token pro zrušení operace.</param>
     /// <response code="200">Úkol po změně stavu.</response>
     /// <response code="404">Úkol se zadaným identifikátorem neexistuje.</response>
     [HttpPost("{id:guid}/complete")]
@@ -121,6 +144,8 @@ public sealed class TodosController : ControllerBase
     }
 
     /// <summary>Smaže úkol.</summary>
+    /// <param name="id">Identifikátor úkolu.</param>
+    /// <param name="cancellationToken">Token pro zrušení operace.</param>
     /// <response code="204">Úkol byl smazán.</response>
     /// <response code="404">Úkol se zadaným identifikátorem neexistuje.</response>
     [HttpDelete("{id:guid}")]
