@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.OpenApi;
+using UAI.ZeroVP.API.OpenApi;
 using UAI.ZeroVP.Data.DependencyInjection;
 using UAI.ZeroVP.Data.InMemory;
 using Serilog;
@@ -77,6 +78,10 @@ builder.Services.AddOpenApi(options =>
 
         return Task.CompletedTask;
     });
+
+    // Co generátor z kódu nevyčte: endpoint /health, hlavička Location, odpovědi bez těla.
+    options.AddDocumentTransformer<HealthCheckDocumentTransformer>();
+    options.AddOperationTransformer<ResponsesOperationTransformer>();
 });
 
 var app = builder.Build();
