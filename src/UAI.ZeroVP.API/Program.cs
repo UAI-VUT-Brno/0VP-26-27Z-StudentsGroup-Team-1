@@ -140,8 +140,9 @@ app.UseSerilogRequestLogging(options =>
 
 if (swaggerEnabled)
 {
-    // Strojově čitelný popis API.
+    // Strojově čitelný popis API: /openapi/v1.json a stejný dokument ve formátu YAML.
     app.MapOpenApi();
+    app.MapOpenApi("/openapi/{documentName}.yaml");
 
     // Interaktivní dokumentace nad tímto popisem – http://localhost:5258/swagger
     app.UseSwaggerUI(options =>
@@ -149,6 +150,9 @@ if (swaggerEnabled)
         options.SwaggerEndpoint("/openapi/v1.json", "UAI.ZeroVP – ToDo API v1");
         options.RoutePrefix = "swagger";
         options.DocumentTitle = "UAI.ZeroVP – ToDo API";
+
+        // Formulář pro odeslání požadavku je otevřený hned, bez klikání na "Try it out".
+        options.EnableTryItOutByDefault();
     });
 }
 
