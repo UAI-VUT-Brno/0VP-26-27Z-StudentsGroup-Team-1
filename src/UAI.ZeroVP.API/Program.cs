@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.OpenApi;
 using UAI.ZeroVP.Data.DependencyInjection;
 using UAI.ZeroVP.Data.InMemory;
@@ -39,11 +40,11 @@ builder.Services.AddSerilog((services, loggerConfiguration) =>
 // --- Služby ---------------------------------------------------------------
 
 builder.Services.AddControllers()
-    .AddJsonOptions(options =>
-    {
-        // Výčty posílá API jako řetězce ("High"), ne jako čísla – čitelnější v curl i ve Swaggeru.
-        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-    });
+    .AddJsonOptions(options => ConfigureJson(options.JsonSerializerOptions));
+
+// Generátor OpenAPI nečte nastavení kontrolerů výše, ale nastavení minimal API.
+// Bez tohoto řádku by dokument popisoval výčty jako čísla, i když je API posílá jako řetězce.
+builder.Services.ConfigureHttpJsonOptions(options => ConfigureJson(options.SerializerOptions));
 
 // Jednotné chybové odpovědi ve formátu ProblemDetails (RFC 9457).
 builder.Services.AddProblemDetails();
@@ -155,3 +156,14 @@ app.MapGet("/", () => Results.Redirect(swaggerEnabled ? "/swagger" : "/api/todos
    .ExcludeFromDescription();
 
 app.Run();
+
+// Jedno nastavení JSON pro kontrolery i pro dokument OpenAPI, aby se nerozcházely.
+static void ConfigureJson(JsonSerializerOptions options)
+{
+    // Výčty posílá API jako řetězce ("High"), ne jako čísla – čitelnější v curl i ve Swaggeru.
+    options.Converters.Add(new JsonStringEnumConverter());
+
+    // Čísla pouze jako JSON čísla. Výchozí webové nastavení přijímá i "5" v uvozovkách
+    // a dokument by pak u každého čísla uváděl typ "integer nebo string".
+    options.NumberHandling = JsonNumberHandling.Strict;
+}
