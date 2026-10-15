@@ -70,19 +70,22 @@ API naslouchá na `http://localhost:5258`. Kořen `/` přesměruje na Swagger UI
 | `GET` | `/health` | Kontrola zdraví – použije ji `HEALTHCHECK` v Dockerfile |
 | `GET` | `/swagger` | Interaktivní dokumentace Swagger UI |
 | `GET` | `/openapi/v1.json` | Popis API ve formátu OpenAPI |
+| `GET` | `/openapi/v1.yaml` | Stejný popis API ve formátu YAML |
 
 Chybové odpovědi mají jednotný tvar `ProblemDetails` (RFC 9457).
 Připravené požadavky k odzkoušení jsou v souboru `src/UAI.ZeroVP.API/UAI.ZeroVP.API.http`.
 
 ## Swagger
 
-Dokument OpenAPI generuje vestavěná knihovna .NET 10 (`Microsoft.AspNetCore.OpenApi`)
-a vystavuje ho na `/openapi/v1.json`. Balíček `Swashbuckle.AspNetCore.SwaggerUI`
-nad ním přidává jen interaktivní uživatelské rozhraní na `/swagger` – druhý generátor
-dokumentu se tedy nepoužívá.
+Dokument OpenAPI 3.1 generuje vestavěná knihovna .NET 10 (`Microsoft.AspNetCore.OpenApi`)
+a vystavuje ho na `/openapi/v1.json` a ve formátu YAML na `/openapi/v1.yaml`.
+Balíček `Swashbuckle.AspNetCore.SwaggerUI` nad ním přidává jen interaktivní uživatelské
+rozhraní na `/swagger` – druhý generátor dokumentu se tedy nepoužívá.
 
 Popisy operací a vlastností ve Swaggeru pocházejí z XML komentářů v kódu;
 proto mají všechny tři projekty zapnuté `<GenerateDocumentationFile>`.
+Jak se dokument generuje, na co si dát pozor a co ověřují testy, popisuje
+[docs/openapi.md](docs/openapi.md).
 
 Swagger je zapnutý v prostředí Development a vypnutý v Production.
 Přepnout ho lze nastavením nebo proměnnou prostředí:
