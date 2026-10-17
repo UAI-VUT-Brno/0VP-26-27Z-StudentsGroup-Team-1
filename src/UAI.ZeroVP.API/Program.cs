@@ -1,5 +1,7 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.OpenApi;
+using UAI.ZeroVP.API.OpenApi;
 using UAI.ZeroVP.Data.DependencyInjection;
 using UAI.ZeroVP.Data.InMemory;
 using Serilog;
@@ -39,11 +41,11 @@ builder.Services.AddSerilog((services, loggerConfiguration) =>
 // --- Služby ---------------------------------------------------------------
 
 builder.Services.AddControllers()
-    .AddJsonOptions(options =>
-    {
-        // Výčty posílá API jako řetězce ("High"), ne jako čísla – čitelnější v curl i ve Swaggeru.
-        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-    });
+    .AddJsonOptions(options => ConfigureJson(options.JsonSerializerOptions));
+
+// Generátor OpenAPI nečte nastavení kontrolerů výše, ale nastavení minimal API.
+// Bez tohoto řádku by dokument popisoval výčty jako čísla, i když je API posílá jako řetězce.
+builder.Services.ConfigureHttpJsonOptions(options => ConfigureJson(options.SerializerOptions));
 
 // Jednotné chybové odpovědi ve formátu ProblemDetails (RFC 9457).
 builder.Services.AddProblemDetails();
@@ -76,6 +78,10 @@ builder.Services.AddOpenApi(options =>
 
         return Task.CompletedTask;
     });
+
+    // Co generátor z kódu nevyčte: endpoint /health, hlavička Location, odpovědi bez těla.
+    options.AddDocumentTransformer<HealthCheckDocumentTransformer>();
+    options.AddOperationTransformer<ResponsesOperationTransformer>();
 });
 
 var app = builder.Build();
@@ -134,8 +140,9 @@ app.UseSerilogRequestLogging(options =>
 
 if (swaggerEnabled)
 {
-    // Strojově čitelný popis API.
+    // Strojově čitelný popis API: /openapi/v1.json a stejný dokument ve formátu YAML.
     app.MapOpenApi();
+    app.MapOpenApi("/openapi/{documentName}.yaml");
 
     // Interaktivní dokumentace nad tímto popisem – http://localhost:5258/swagger
     app.UseSwaggerUI(options =>
@@ -143,6 +150,9 @@ if (swaggerEnabled)
         options.SwaggerEndpoint("/openapi/v1.json", "UAI.ZeroVP – ToDo API v1");
         options.RoutePrefix = "swagger";
         options.DocumentTitle = "UAI.ZeroVP – ToDo API";
+
+        // Formulář pro odeslání požadavku je otevřený hned, bez klikání na "Try it out".
+        options.EnableTryItOutByDefault();
     });
 }
 
@@ -155,3 +165,14 @@ app.MapGet("/", () => Results.Redirect(swaggerEnabled ? "/swagger" : "/api/todos
    .ExcludeFromDescription();
 
 app.Run();
+
+// Jedno nastavení JSON pro kontrolery i pro dokument OpenAPI, aby se nerozcházely.
+static void ConfigureJson(JsonSerializerOptions options)
+{
+    // Výčty posílá API jako řetězce ("High"), ne jako čísla – čitelnější v curl i ve Swaggeru.
+    options.Converters.Add(new JsonStringEnumConverter());
+
+    // Čísla pouze jako JSON čísla. Výchozí webové nastavení přijímá i "5" v uvozovkách
+    // a dokument by pak u každého čísla uváděl typ "integer nebo string".
+    options.NumberHandling = JsonNumberHandling.Strict;
+}

@@ -4,6 +4,9 @@
 GET {{UAI.ZeroVP.API_HostAddress}}/openapi/v1.json
 Accept: application/json
 
+### Stejný popis API ve formátu YAML
+GET {{UAI.ZeroVP.API_HostAddress}}/openapi/v1.yaml
+
 ### Informace o běžící instanci (v Dockeru ukáže hostname kontejneru)
 GET {{UAI.ZeroVP.API_HostAddress}}/api/info
 Accept: application/json

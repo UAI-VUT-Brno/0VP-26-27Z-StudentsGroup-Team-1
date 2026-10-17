@@ -5,6 +5,10 @@
 /// Záměrně neobsahuje interní sloupce entity (např. <c>UpdatedAtUtc</c>) –
 /// to je hlavní důvod, proč DTO existuje jako samostatná vrstva.
 /// </summary>
+/// <remarks>
+/// Všechny vlastnosti jsou <c>required</c>: API je v odpovědi posílá vždy, i s hodnotou <c>null</c>,
+/// a dokument OpenAPI je díky tomu uvádí jako povinné.
+/// </remarks>
 public sealed record TodoItemDto
 {
     /// <summary>Jednoznačný identifikátor úkolu.</summary>
@@ -14,17 +18,17 @@ public sealed record TodoItemDto
     public required string Title { get; init; }
 
     /// <summary>Volitelný podrobnější popis.</summary>
-    public string? Description { get; init; }
+    public required string? Description { get; init; }
 
     /// <summary>Priorita úkolu.</summary>
-    public TodoPriority Priority { get; init; }
+    public required TodoPriority Priority { get; init; }
 
     /// <summary>Příznak, zda je úkol hotový.</summary>
-    public bool IsCompleted { get; init; }
+    public required bool IsCompleted { get; init; }
 
     /// <summary>Okamžik vytvoření (UTC).</summary>
-    public DateTimeOffset CreatedAtUtc { get; init; }
+    public required DateTimeOffset CreatedAtUtc { get; init; }
 
     /// <summary>Okamžik dokončení (UTC), nebo <c>null</c> pokud úkol hotový není.</summary>
-    public DateTimeOffset? CompletedAtUtc { get; init; }
+    public required DateTimeOffset? CompletedAtUtc { get; init; }
 }
