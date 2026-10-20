@@ -20,6 +20,7 @@ public sealed class TodoMapperTests
         Description = "Vícefázový build.",
         Priority = TodoPriority.High,
         IsCompleted = isCompleted,
+        DueAtUtc = CreatedAt.AddDays(7),
         CreatedAtUtc = CreatedAt,
         CompletedAtUtc = isCompleted ? CreatedAt.AddHours(1) : null,
         UpdatedAtUtc = CreatedAt.AddHours(1)
@@ -39,6 +40,7 @@ public sealed class TodoMapperTests
         Assert.Equal(entity.Description, dto.Description);
         Assert.Equal(entity.Priority, dto.Priority);
         Assert.Equal(entity.IsCompleted, dto.IsCompleted);
+        Assert.Equal(entity.DueAtUtc, dto.DueAtUtc);
         Assert.Equal(entity.CreatedAtUtc, dto.CreatedAtUtc);
         Assert.Equal(entity.CompletedAtUtc, dto.CompletedAtUtc);
     }
@@ -84,6 +86,15 @@ public sealed class TodoMapperTests
         Assert.Equal(Now, entity.UpdatedAtUtc);
     }
 
+    [Fact]
+    public void ToEntity_CreatesItemWithoutDueDate()
+    {
+        // Běžné založení úkolu termín nezná – zůstává zpětně kompatibilní.
+        var request = new CreateTodoItemRequest { Title = "Úkol" };
+
+        Assert.Null(request.ToEntity(Now).DueAtUtc);
+    }
+    
     [Fact]
     public void ToEntity_EachCallGeneratesDifferentId()
     {

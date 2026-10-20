@@ -24,6 +24,9 @@ public sealed class TodoItem
     /// <summary>Příznak, zda je úkol hotový.</summary>
     public bool IsCompleted { get; set; }
 
+    /// <summary>Termín splnění (UTC), nebo <c>null</c> pokud úkol termín nemá.</summary>
+    public DateTimeOffset? DueAtUtc { get; set; }
+
     /// <summary>Okamžik vytvoření (UTC).</summary>
     public required DateTimeOffset CreatedAtUtc { get; init; }
 
@@ -45,6 +48,7 @@ public sealed class TodoItem
         Description = Description,
         Priority = Priority,
         IsCompleted = IsCompleted,
+        DueAtUtc = DueAtUtc,
         CreatedAtUtc = CreatedAtUtc,
         CompletedAtUtc = CompletedAtUtc,
         UpdatedAtUtc = UpdatedAtUtc
