@@ -9,7 +9,7 @@ can be tried out.
 - The API describes itself in an **OpenAPI 3.1.1** document, generated from the code at runtime.
   There is no hand-written copy that could drift from the implementation.
 - The document is served as JSON and YAML. Swagger UI on top of it lets you send requests from the browser.
-- All 8 endpoints are documented, including `/health` and every error response the API can return
+- All 9 endpoints are documented, including `/health` and every error response the API can return
   (`400`, `404`, `415`, `500`, `503`).
 - Automated tests check that the document is valid OpenAPI and that it matches what the API really returns.
 
@@ -37,6 +37,7 @@ curl http://localhost:5258/openapi/v1.yaml -o openapi.yaml
 |---|---|---|---|
 | `GET` | `/api/todos` | query `isCompleted` (boolean, optional) | `200` list of `TodoItemDto`, `400`, `500` |
 | `POST` | `/api/todos` | body `CreateTodoItemRequest` | `201` `TodoItemDto` + `Location` header, `400`, `415`, `500` |
+| `POST` | `/api/todos/repeat` | body `CreateRepeatingTodoItemRequest` | `201` list of `TodoItemDto` + `Location` header of the first occurrence, `400`, `415`, `500` |
 | `GET` | `/api/todos/{id}` | path `id` (uuid) | `200` `TodoItemDto`, `404`, `500` |
 | `PUT` | `/api/todos/{id}` | path `id` (uuid), body `UpdateTodoItemRequest` | `200` `TodoItemDto`, `400`, `404`, `415`, `500` |
 | `DELETE` | `/api/todos/{id}` | path `id` (uuid) | `204` no body, `404`, `500` |
@@ -63,12 +64,13 @@ It reads the controllers through ApiExplorer:
 | `[DefaultValue]` and XML `<example>` on DTO properties | `default` and `examples` (Swagger UI pre-fills the form with them) |
 | `<summary>` of DTO properties | property descriptions; notes for developers are in `<remarks>`, which the generator ignores |
 
-What the generator cannot read from the code is added by two transformers in `src/UAI.ZeroVP.API/OpenApi/`:
+What the generator cannot read from the code is added by three transformers in `src/UAI.ZeroVP.API/OpenApi/`:
 
 | Transformer | What it does |
 |---|---|
 | `HealthCheckDocumentTransformer` | Adds `GET /health`. `MapHealthChecks` does not describe its endpoint for ApiExplorer, so it would be missing. |
 | `ResponsesOperationTransformer` | Removes the empty `application/json` that `[Produces]` adds to responses without a body (`204`) or with another content type (`500`), adds the `Location` header to `201`, and sorts responses by status code. |
+| `AssumeUtcDateTimeSchemaTransformer` | Sets `type: string` on `firstDueAtUtc`. The property has a custom JSON converter (a value without an offset is read as UTC), and the generator leaves out the type of such properties. |
 
 ## Pitfalls for maintainers
 
@@ -80,6 +82,9 @@ What the generator cannot read from the code is added by two transformers in `sr
   an operation parameter (for example `cancellationToken`) into the request body description, and the last
   one wins. In actions with a request body, `<param name="request">` must stay after `cancellationToken`.
   `RequestBody_IsDescribedByTheRequestParameter` fails if the order changes.
+  - **Custom JSON converters hide the type.** A property with `[JsonConverter]` gets a schema without `type`.
+  For `DateTimeOffset?` the converter is wrapped in `NullableConverter`, so the transformer looks for the attribute,
+  not for `JsonPropertyInfo.CustomConverter`. `DateWithCustomConverter_IsDocumentedAsDateTimeString` guards this.
 - **`/health` is described by hand.** If its route or responses change, update `HealthCheckDocumentTransformer`.
   The tests send a request to the documented path and compare the response with the document.
 - A URL that does not match any route, for example `/api/todos/abc` (not a GUID), returns `404` with
@@ -105,6 +110,7 @@ and reads the document with the `Microsoft.OpenApi` library, the same way client
 | `Document_DescribesEveryEndpointOfTheApplication` | Every endpoint registered in the application is in the document |
 | `Operation_DocumentsAllResponses` | Each operation has a summary and exactly the expected status codes, each with a description |
 | `Priority_IsDocumentedAsTheStringsTheApiSends`, `Numbers_AreDocumentedAsIntegersOnly` | Data types match the JSON the API sends |
+| `DateWithCustomConverter_IsDocumentedAsDateTimeString` | `firstDueAtUtc` is documented as a `date-time` string despite its custom converter |
 | `CreatedResponse_DocumentsLocationHeader`, `NoContentResponse_HasNoBody`, `ErrorResponses_UseProblemDetails` | Response headers, bodies and error schemas |
 | `RequestBody_IsDescribedByTheRequestParameter` | Guards the `<param>` order described above |
 | `Response_MatchesDocument`, `SuccessfulTodoLifecycle_MatchesDocument` | Real requests (success, `400`, `404`, `415`) return a status code, content type and required headers listed in the document |
