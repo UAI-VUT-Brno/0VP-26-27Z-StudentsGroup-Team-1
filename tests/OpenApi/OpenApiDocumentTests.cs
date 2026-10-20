@@ -24,6 +24,9 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
 {
     /// <summary>Identifikátor, který v úložišti není (ukázková data mají náhodné GUID).</summary>
     private const string MissingId = "00000000-0000-0000-0000-000000000001";
+    
+    /// <summary>Platné tělo požadavku <c>POST /api/todos/repeat</c>.</summary>
+    private const string RepeatBody = "{\"title\":\"Týdenní report\",\"firstDueAtUtc\":\"2026-10-26T09:00:00Z\",\"repeatCount\":3}";
 
     private readonly OpenApiTestFactory _factory;
     private readonly HttpClient _client;
@@ -62,6 +65,7 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
     [Theory]
     [InlineData("GET", "/api/todos", "200 400 500")]
     [InlineData("POST", "/api/todos", "201 400 415 500")]
+    [InlineData("POST", "/api/todos/repeat", "201 400 415 500")]
     [InlineData("GET", "/api/todos/{id}", "200 404 500")]
     [InlineData("PUT", "/api/todos/{id}", "200 400 404 415 500")]
     [InlineData("DELETE", "/api/todos/{id}", "204 404 500")]
@@ -178,6 +182,7 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
     [Theory]
     [InlineData("POST", "/api/todos", "Údaje nového úkolu.")]
     [InlineData("PUT", "/api/todos/{id}", "Nové hodnoty úkolu.")]
+    [InlineData("POST", "/api/todos/repeat", "Údaje opakovaného úkolu a počet opakování.")]
     public async Task RequestBody_IsDescribedByTheRequestParameter(string method, string path, string description)
     {
         var operation = GetOperation(await LoadDocumentAsync(), method, path);
@@ -193,6 +198,9 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
     [InlineData("POST", "/api/todos", "/api/todos", "{\"title\":\"\"}", "application/json", 400)]
     [InlineData("POST", "/api/todos", "/api/todos", "{neplatný json", "application/json", 400)]
     [InlineData("POST", "/api/todos", "/api/todos", "Úkol", "text/plain", 415)]
+    [InlineData("POST", "/api/todos/repeat", "/api/todos/repeat", RepeatBody, "application/json", 201)]
+    [InlineData("POST", "/api/todos/repeat", "/api/todos/repeat", "{\"title\":\"Úkol\",\"repeatCount\":0}", "application/json", 400)]
+    [InlineData("POST", "/api/todos/repeat", "/api/todos/repeat", "Úkol", "text/plain", 415)]
     [InlineData("GET", "/api/todos/" + MissingId, "/api/todos/{id}", null, null, 404)]
     [InlineData("PUT", "/api/todos/" + MissingId, "/api/todos/{id}", "{\"title\":\"Úkol\"}", "application/json", 404)]
     [InlineData("PUT", "/api/todos/" + MissingId, "/api/todos/{id}", "Úkol", "text/plain", 415)]
