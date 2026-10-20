@@ -150,6 +150,98 @@ public sealed class TodosControllerTests
         Assert.Equal(Now, stored.CreatedAtUtc);
         Assert.False(stored.IsCompleted);
     }
+    
+    [Fact]
+    public async Task Create_ReturnsItemWithoutDueDate()
+    {
+        var result = await CreateController().Create(new CreateTodoItemRequest { Title = "Úkol" }, CancellationToken.None);
+
+        var dto = Assert.IsType<TodoItemDto>(Assert.IsType<CreatedAtRouteResult>(result.Result).Value);
+        Assert.Null(dto.DueAtUtc);
+    }
+
+    // --- POST /api/todos/repeat ---------------------------------------------
+
+    private static readonly DateTimeOffset FirstDue = new(2026, 9, 7, 9, 0, 0, TimeSpan.Zero);
+
+    private static CreateRepeatingTodoItemRequest CreateRepeatingRequest(int repeatCount = 3) => new()
+    {
+        Title = "Týdenní report",
+        Description = "Shrnout týden.",
+        Priority = TodoPriority.High,
+        FirstDueAtUtc = FirstDue,
+        RepeatCount = repeatCount
+    };
+
+    /// <summary>Ověří odpověď 201 Created a vrátí vytvořené výskyty.</summary>
+    private static IReadOnlyList<TodoItemDto> AssertCreatedOccurrences(ActionResult<IReadOnlyList<TodoItemDto>> result)
+    {
+        var created = Assert.IsType<CreatedAtRouteResult>(result.Result);
+        return Assert.IsAssignableFrom<IReadOnlyList<TodoItemDto>>(created.Value);
+    }
+
+    [Fact]
+    public async Task CreateRepeating_ReturnsCreatedWithAllOccurrences()
+    {
+        var result = await CreateController().CreateRepeating(CreateRepeatingRequest(repeatCount: 3), CancellationToken.None);
+
+        var occurrences = AssertCreatedOccurrences(result);
+        Assert.Equal(
+            [FirstDue, FirstDue.AddDays(7), FirstDue.AddDays(14), FirstDue.AddDays(21)],
+            occurrences.Select(occurrence => occurrence.DueAtUtc));
+        Assert.All(occurrences, occurrence =>
+        {
+            Assert.Equal("Týdenní report", occurrence.Title);
+            Assert.Equal("Shrnout týden.", occurrence.Description);
+            Assert.Equal(TodoPriority.High, occurrence.Priority);
+            Assert.False(occurrence.IsCompleted);
+            Assert.Equal(Now, occurrence.CreatedAtUtc);
+        });
+    }
+
+    [Fact]
+    public async Task CreateRepeating_LocationPointsToFirstOccurrence()
+    {
+        var result = await CreateController().CreateRepeating(CreateRepeatingRequest(), CancellationToken.None);
+
+        var created = Assert.IsType<CreatedAtRouteResult>(result.Result);
+        var occurrences = Assert.IsAssignableFrom<IReadOnlyList<TodoItemDto>>(created.Value);
+        Assert.Equal(nameof(TodosController.GetById), created.RouteName);
+        Assert.Equal(occurrences[0].Id, created.RouteValues!["id"]);
+    }
+
+    [Fact]
+    public async Task CreateRepeating_StoresEveryOccurrence()
+    {
+        var occurrences = AssertCreatedOccurrences(
+            await CreateController().CreateRepeating(CreateRepeatingRequest(repeatCount: 52), CancellationToken.None));
+
+        Assert.Equal(53, await _repository.CountAsync());
+        foreach (var occurrence in occurrences)
+        {
+            var stored = await _repository.GetByIdAsync(occurrence.Id);
+            Assert.NotNull(stored);
+            Assert.Equal(occurrence.DueAtUtc, stored.DueAtUtc);
+        }
+    }
+
+    [Fact]
+    public async Task CreateRepeating_OccurrencesAreIndependentTasks()
+    {
+        // Výskyty nejsou pravidlo opakování: dokončení ani smazání jednoho se ostatních nedotkne.
+        var controller = CreateController();
+        var occurrences = AssertCreatedOccurrences(
+            await controller.CreateRepeating(CreateRepeatingRequest(repeatCount: 2), CancellationToken.None));
+
+        await controller.Complete(occurrences[0].Id, CancellationToken.None);
+        await controller.Delete(occurrences[1].Id, CancellationToken.None);
+
+        Assert.True((await _repository.GetByIdAsync(occurrences[0].Id))!.IsCompleted);
+        Assert.Null(await _repository.GetByIdAsync(occurrences[1].Id));
+        var untouched = await _repository.GetByIdAsync(occurrences[2].Id);
+        Assert.NotNull(untouched);
+        Assert.False(untouched.IsCompleted);
+    }
 
     // --- PUT /api/todos/{id} ------------------------------------------------
 

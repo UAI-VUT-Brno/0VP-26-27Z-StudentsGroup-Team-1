@@ -125,6 +125,82 @@ public sealed class TodoMapperTests
         Assert.Null(request.ToEntity(Now).Description);
     }
 
+    // --- ToEntities (opakovaný úkol) ----------------------------------------
+
+    private static readonly DateTimeOffset FirstDue = new(2026, 10, 26, 9, 0, 0, TimeSpan.Zero);
+
+    private static CreateRepeatingTodoItemRequest CreateRepeatingRequest(int repeatCount = 3) => new()
+    {
+        Title = "  Týdenní report  ",
+        Description = "  Shrnout týden.  ",
+        Priority = TodoPriority.High,
+        FirstDueAtUtc = FirstDue,
+        RepeatCount = repeatCount
+    };
+
+    [Fact]
+    public void ToEntities_CreatesFirstOccurrencePlusRepeatCount()
+    {
+        var entities = CreateRepeatingRequest(repeatCount: 3).ToEntities(Now);
+
+        Assert.Equal(4, entities.Count);
+    }
+
+    [Fact]
+    public void ToEntities_EachOccurrenceIsDueOneWeekAfterThePrevious()
+    {
+        var entities = CreateRepeatingRequest(repeatCount: 3).ToEntities(Now);
+
+        Assert.Equal(
+            [FirstDue, FirstDue.AddDays(7), FirstDue.AddDays(14), FirstDue.AddDays(21)],
+            entities.Select(entity => entity.DueAtUtc));
+    }
+
+    [Fact]
+    public void ToEntities_EachOccurrenceHasItsOwnId()
+    {
+        var entities = CreateRepeatingRequest().ToEntities(Now);
+
+        Assert.All(entities, entity => Assert.NotEqual(Guid.Empty, entity.Id));
+        Assert.Equal(entities.Count, entities.Select(entity => entity.Id).Distinct().Count());
+    }
+
+    [Fact]
+    public void ToEntities_CopiesNormalizedTaskFieldsToEveryOccurrence()
+    {
+        var entities = CreateRepeatingRequest().ToEntities(Now);
+
+        Assert.All(entities, entity =>
+        {
+            Assert.Equal("Týdenní report", entity.Title);
+            Assert.Equal("Shrnout týden.", entity.Description);
+            Assert.Equal(TodoPriority.High, entity.Priority);
+        });
+    }
+
+    [Fact]
+    public void ToEntities_EveryOccurrenceStartsIncompleteAndStampedWithGivenTime()
+    {
+        var entities = CreateRepeatingRequest().ToEntities(Now);
+
+        Assert.All(entities, entity =>
+        {
+            Assert.False(entity.IsCompleted);
+            Assert.Null(entity.CompletedAtUtc);
+            Assert.Equal(Now, entity.CreatedAtUtc);
+            Assert.Equal(Now, entity.UpdatedAtUtc);
+        });
+    }
+
+    [Fact]
+    public void ToEntities_MissingFirstDueDate_Throws()
+    {
+        // Validace v API to zachytí dřív; mapper jen nesmí tiše vytvořit úkoly bez termínu.
+        var request = CreateRepeatingRequest() with { FirstDueAtUtc = null };
+
+        Assert.Throws<ArgumentException>(() => request.ToEntities(Now));
+    }
+
     // --- ApplyTo ------------------------------------------------------------
 
     [Fact]

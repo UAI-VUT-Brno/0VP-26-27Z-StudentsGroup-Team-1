@@ -84,6 +84,39 @@ public sealed class TodosController : ControllerBase
         return CreatedAtRoute(nameof(GetById), new { id = created.Id }, created.ToDto());
     }
 
+    /// <summary>Založí úkol, který se opakuje každý týden.</summary>
+    /// <remarks>
+    /// Vznikne první výskyt a <c>repeatCount</c> dalších, každý o sedm dní později.
+    /// Výskyty jsou samostatné úkoly: dokončení nebo smazání jednoho se ostatních nedotkne.
+    /// Při chybě ve vstupu se nevytvoří žádný.
+    /// </remarks>
+    /// <param name="cancellationToken">Token pro zrušení operace.</param>
+    /// <param name="request">Údaje opakovaného úkolu a počet opakování.</param>
+    /// <response code="201">Výskyty byly vytvořeny, seřazené podle termínu; hlavička <c>Location</c> odkazuje na první z nich.</response>
+    /// <response code="400">Tělo požadavku není platný JSON nebo neprošlo validací; nevznikl žádný úkol.</response>
+    /// <response code="415">Tělo požadavku není ve formátu JSON (chybí hlavička <c>Content-Type: application/json</c>).</response>
+    [HttpPost("repeat")]
+    [ProducesResponseType(typeof(IReadOnlyList<TodoItemDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status415UnsupportedMediaType)]
+    public async Task<ActionResult<IReadOnlyList<TodoItemDto>>> CreateRepeating(
+        [FromBody] CreateRepeatingTodoItemRequest request,
+        CancellationToken cancellationToken)
+    {
+        var entities = request.ToEntities(_timeProvider.GetUtcNow());
+        var created = await _repository.AddRangeAsync(entities, cancellationToken);
+
+        _logger.LogInformation(
+            "Vytvořen opakovaný úkol ({Title}) s {OccurrenceCount} výskyty od {FirstDueAtUtc}.",
+            created[0].Title, created.Count, created[0].DueAtUtc);
+
+        return CreatedAtRoute(
+            nameof(GetById),
+            new { id = created[0].Id },
+            created.Select(item => item.ToDto()).ToList());
+    }
+
+
     /// <summary>Přepíše existující úkol novými hodnotami.</summary>
     /// <remarks>
     /// Jde o úplnou aktualizaci: hodnota, která v těle chybí, se nastaví na výchozí
