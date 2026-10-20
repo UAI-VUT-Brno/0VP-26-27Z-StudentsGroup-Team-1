@@ -285,6 +285,9 @@ public sealed class TodosControllerTests
         public Task<TodoItem> AddAsync(TodoItem item, CancellationToken cancellationToken = default) =>
             inner.AddAsync(item, cancellationToken);
 
+        public Task<IReadOnlyList<TodoItem>> AddRangeAsync(IEnumerable<TodoItem> items, CancellationToken cancellationToken = default) =>
+            inner.AddRangeAsync(items, cancellationToken);
+
         public async Task<bool> UpdateAsync(TodoItem item, CancellationToken cancellationToken = default)
         {
             await inner.DeleteAsync(item.Id, cancellationToken);

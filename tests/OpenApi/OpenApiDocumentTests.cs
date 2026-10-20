@@ -320,6 +320,9 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
 
         public Task<TodoItem> AddAsync(TodoItem item, CancellationToken cancellationToken = default) => throw Failure();
 
+        public Task<IReadOnlyList<TodoItem>> AddRangeAsync(IEnumerable<TodoItem> items, CancellationToken cancellationToken = default) => 
+            throw Failure();
+
         public Task<bool> UpdateAsync(TodoItem item, CancellationToken cancellationToken = default) => throw Failure();
 
         public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default) => throw Failure();
