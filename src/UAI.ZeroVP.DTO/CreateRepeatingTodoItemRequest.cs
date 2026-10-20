@@ -1,11 +1,13 @@
 ﻿using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
+using UAI.ZeroVP.DTO.Json;
 
 namespace UAI.ZeroVP.DTO;
 
 /// <summary>
 /// Vstup pro založení týdně se opakujícího úkolu (HTTP POST /api/todos/repeat).
-/// Vznikne první výskyt a <see cref="RepeatCount"/> dalších, vždy o sedm dní později.
+/// Vznikne první výskyt a <c>repeatCount</c> dalších, vždy o sedm dní později.
 /// Každý výskyt je samostatný úkol – nejde o trvalé pravidlo opakování.
 /// </summary>
 /// <remarks>
@@ -42,13 +44,17 @@ public sealed record CreateRepeatingTodoItemRequest : IValidatableObject
     [EnumDataType(typeof(TodoPriority), ErrorMessage = "Neplatná hodnota priority.")]
     public TodoPriority Priority { get; init; } = TodoPriority.Normal;
 
-    /// <summary>Termín prvního výskytu v UTC, ve formátu ISO 8601 (např. <c>2026-10-26T09:00:00Z</c>). Povinný.</summary>
+    /// <summary>
+    /// Termín prvního výskytu ve formátu ISO 8601, např. <c>2026-10-26T09:00:00Z</c>. Povinný.
+    /// Hodnota bez časové zóny se bere jako UTC, hodnota s jiným posunem se na UTC převede.
+    /// </summary>
     /// <remarks>
     /// Typ s <c>?</c>, aby šlo poznat chybějící hodnotu: jinak by se dosadilo
     /// <c>0001-01-01</c> a <c>[Required]</c> by nic nenašel.
     /// </remarks>
     /// <example>2026-10-26T09:00:00Z</example>
     [Required(ErrorMessage = "Termín prvního výskytu je povinný.")]
+    [JsonConverter(typeof(AssumeUtcDateTimeOffsetConverter))]
     public DateTimeOffset? FirstDueAtUtc { get; init; }
 
     /// <summary>Počet dalších týdenních opakování po prvním výskytu, 1–52. Hodnota 3 vytvoří čtyři úkoly.</summary>

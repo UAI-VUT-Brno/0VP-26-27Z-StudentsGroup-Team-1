@@ -124,6 +124,17 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
     }
 
     [Fact]
+    public async Task DateWithCustomConverter_IsDocumentedAsDateTimeString()
+    {
+        // Vlastní převodník JSON schovává generátoru typ; doplňuje ho AssumeUtcDateTimeSchemaTransformer.
+        var schema = (await LoadDocumentAsync()).Components!.Schemas!["CreateRepeatingTodoItemRequest"];
+
+        var firstDue = schema.Properties!["firstDueAtUtc"];
+        Assert.Equal(JsonSchemaType.String, firstDue.Type);
+        Assert.Equal("date-time", firstDue.Format);
+    }
+
+    [Fact]
     public async Task CreatedResponse_DocumentsLocationHeader()
     {
         var response = GetOperation(await LoadDocumentAsync(), "POST", "/api/todos").Responses!["201"];

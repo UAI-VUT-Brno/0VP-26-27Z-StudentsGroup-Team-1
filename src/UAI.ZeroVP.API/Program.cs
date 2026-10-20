@@ -78,10 +78,12 @@ builder.Services.AddOpenApi(options =>
 
         return Task.CompletedTask;
     });
-
-    // Co generátor z kódu nevyčte: endpoint /health, hlavička Location, odpovědi bez těla.
+    
+    // Co generátor z kódu nevyčte: endpoint /health, hlavička Location, odpovědi bez těla,
+    // typ data s vlastním převodníkem JSON.
     options.AddDocumentTransformer<HealthCheckDocumentTransformer>();
     options.AddOperationTransformer<ResponsesOperationTransformer>();
+    options.AddSchemaTransformer<AssumeUtcDateTimeSchemaTransformer>();
 });
 
 var app = builder.Build();
