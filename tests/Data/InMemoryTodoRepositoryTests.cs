@@ -21,12 +21,15 @@ public sealed class InMemoryTodoRepositoryTests
         string title = "Úkol",
         TodoPriority priority = TodoPriority.Normal,
         bool isCompleted = false,
-        DateTimeOffset? createdAtUtc = null) => new()
+        DateTimeOffset? createdAtUtc = null,
+        DateTimeOffset? dueAtUtc = null) => new()
+
     {
         Id = Guid.NewGuid(),
         Title = title,
         Priority = priority,
         IsCompleted = isCompleted,
+        DueAtUtc = dueAtUtc,
         CreatedAtUtc = createdAtUtc ?? Now,
         UpdatedAtUtc = createdAtUtc ?? Now
     };
@@ -136,6 +139,109 @@ public sealed class InMemoryTodoRepositoryTests
         var repository = CreateEmptyRepository();
 
         await Assert.ThrowsAsync<ArgumentNullException>(() => repository.AddAsync(null!));
+    }
+    
+    // --- Přidání více úkolů najednou ----------------------------------------
+
+    [Fact]
+    public async Task AddRangeAsync_NewItems_AreAllStoredWithTheirDueDates()
+    {
+        var repository = CreateEmptyRepository();
+        var items = Enumerable.Range(0, 4)
+            .Select(week => CreateItem($"Týden {week}", dueAtUtc: Now.AddDays(7 * week)))
+            .ToList();
+
+        await repository.AddRangeAsync(items);
+
+        Assert.Equal(4, await repository.CountAsync());
+        foreach (var item in items)
+        {
+            var stored = await repository.GetByIdAsync(item.Id);
+            Assert.NotNull(stored);
+            Assert.Equal(item.Title, stored.Title);
+            Assert.Equal(item.DueAtUtc, stored.DueAtUtc);
+        }
+    }
+
+    [Fact]
+    public async Task AddRangeAsync_ReturnsCopiesInInputOrder()
+    {
+        var repository = CreateEmptyRepository();
+        var items = new[] { CreateItem("První"), CreateItem("Druhý"), CreateItem("Třetí") };
+
+        var returned = await repository.AddRangeAsync(items);
+        returned[0].Title = "Změněno přes vrácenou instanci";
+
+        Assert.Equal(items.Select(item => item.Id), returned.Select(item => item.Id));
+        Assert.All(returned.Zip(items), pair => Assert.NotSame(pair.Second, pair.First));
+        Assert.Equal("První", (await repository.GetByIdAsync(items[0].Id))!.Title);
+    }
+
+    [Fact]
+    public async Task AddRangeAsync_EmptyBatch_StoresNothing()
+    {
+        var repository = CreateEmptyRepository();
+
+        Assert.Empty(await repository.AddRangeAsync([]));
+        Assert.Equal(0, await repository.CountAsync());
+    }
+
+    [Fact]
+    public async Task AddRangeAsync_IdAlreadyStored_ThrowsAndStoresNoneOfTheBatch()
+    {
+        var repository = CreateEmptyRepository();
+        var existing = CreateItem("Už uložený");
+        await repository.AddAsync(existing);
+
+        // Kolize až u posledního prvku – první dva se stihnou vložit a musí se vrátit zpět.
+        var batch = new[] { CreateItem(), CreateItem(), existing.Clone() };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => repository.AddRangeAsync(batch));
+
+        Assert.Equal(1, await repository.CountAsync());
+        Assert.Null(await repository.GetByIdAsync(batch[0].Id));
+        Assert.Null(await repository.GetByIdAsync(batch[1].Id));
+    }
+
+    [Fact]
+    public async Task AddRangeAsync_DuplicateIdWithinBatch_ThrowsAndStoresNothing()
+    {
+        var repository = CreateEmptyRepository();
+        var item = CreateItem();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => repository.AddRangeAsync([CreateItem(), item, item.Clone()]));
+
+        Assert.Equal(0, await repository.CountAsync());
+    }
+
+    [Fact]
+    public async Task AddRangeAsync_NullBatch_ThrowsArgumentNullException()
+    {
+        var repository = CreateEmptyRepository();
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() => repository.AddRangeAsync(null!));
+    }
+
+    [Fact]
+    public async Task AddRangeAsync_NullItem_ThrowsAndStoresNothing()
+    {
+        var repository = CreateEmptyRepository();
+
+        await Assert.ThrowsAsync<ArgumentException>(() => repository.AddRangeAsync([CreateItem(), null!]));
+
+        Assert.Equal(0, await repository.CountAsync());
+    }
+
+    [Fact]
+    public async Task AddRangeAsync_CancelledToken_StoresNothing()
+    {
+        var repository = CreateEmptyRepository();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => repository.AddRangeAsync([CreateItem(), CreateItem()], new CancellationToken(canceled: true)));
+
+        Assert.Equal(0, await repository.CountAsync());
     }
 
     // --- Čtení jednoho úkolu ------------------------------------------------
@@ -338,6 +444,7 @@ public sealed class InMemoryTodoRepositoryTests
         { "GetAll", (repository, token) => repository.GetAllAsync(cancellationToken: token) },
         { "GetById", (repository, token) => repository.GetByIdAsync(Guid.NewGuid(), token) },
         { "Add", (repository, token) => repository.AddAsync(CreateItem(), token) },
+        { "AddRange", (repository, token) => repository.AddRangeAsync([CreateItem()], token) },
         { "Update", (repository, token) => repository.UpdateAsync(CreateItem(), token) },
         { "Delete", (repository, token) => repository.DeleteAsync(Guid.NewGuid(), token) },
         { "Count", (repository, token) => repository.CountAsync(token) }

@@ -19,6 +19,7 @@ public sealed class TodoItemTests
         Description = "Vícefázový build.",
         Priority = TodoPriority.High,
         IsCompleted = true,
+        DueAtUtc = CreatedAt.AddDays(7),
         CreatedAtUtc = CreatedAt,
         CompletedAtUtc = CreatedAt.AddHours(2),
         UpdatedAtUtc = CreatedAt.AddHours(3)
@@ -36,6 +37,7 @@ public sealed class TodoItemTests
         Assert.Equal(original.Description, clone.Description);
         Assert.Equal(original.Priority, clone.Priority);
         Assert.Equal(original.IsCompleted, clone.IsCompleted);
+        Assert.Equal(original.DueAtUtc, clone.DueAtUtc);
         Assert.Equal(original.CreatedAtUtc, clone.CreatedAtUtc);
         Assert.Equal(original.CompletedAtUtc, clone.CompletedAtUtc);
         Assert.Equal(original.UpdatedAtUtc, clone.UpdatedAtUtc);
@@ -82,6 +84,7 @@ public sealed class TodoItemTests
         clone.Description = null;
         clone.Priority = TodoPriority.Low;
         clone.IsCompleted = false;
+        clone.DueAtUtc = null;
         clone.CompletedAtUtc = null;
         clone.UpdatedAtUtc = CreatedAt.AddDays(1);
 
@@ -89,6 +92,7 @@ public sealed class TodoItemTests
         Assert.Equal("Vícefázový build.", original.Description);
         Assert.Equal(TodoPriority.High, original.Priority);
         Assert.True(original.IsCompleted);
+        Assert.Equal(CreatedAt.AddDays(7), original.DueAtUtc);
         Assert.Equal(CreatedAt.AddHours(2), original.CompletedAtUtc);
         Assert.Equal(CreatedAt.AddHours(3), original.UpdatedAtUtc);
     }
@@ -106,6 +110,7 @@ public sealed class TodoItemTests
         var clone = original.Clone();
 
         Assert.Null(clone.Description);
+        Assert.Null(clone.DueAtUtc);
         Assert.Null(clone.CompletedAtUtc);
     }
 }

@@ -22,7 +22,7 @@ v sekci [Výukové materiály k Dockeru](#výukové-materiály-k-dockeru).
 
 | Projekt | Typ | Obsah | Závislosti |
 |---|---|---|---|
-| `UAI.ZeroVP.DTO` | Class library | Kontrakt API – `TodoItemDto`, `CreateTodoItemRequest`, `UpdateTodoItemRequest`, `InstanceInfoDto`, výčet `TodoPriority` | žádné |
+| `UAI.ZeroVP.DTO` | Class library | Kontrakt API – `TodoItemDto`, `CreateTodoItemRequest`, `CreateRepeatingTodoItemRequest`, `UpdateTodoItemRequest`, `InstanceInfoDto`, výčet `TodoPriority` | žádné |
 | `UAI.ZeroVP.Data` | Class library | Entita `TodoItem`, rozhraní `ITodoRepository`, paměťová implementace `InMemoryTodoRepository`, registrace do DI | `DTO` |
 | `UAI.ZeroVP.API` | ASP.NET Core Web API | Kontrolery, mapování entita ↔ DTO, konfigurace pipeline | `DTO`, `Data` |
 
@@ -63,6 +63,7 @@ API naslouchá na `http://localhost:5258`. Kořen `/` přesměruje na Swagger UI
 | `GET` | `/api/todos` | Seznam úkolů; volitelný filtr `?isCompleted=true\|false` |
 | `GET` | `/api/todos/{id}` | Detail úkolu |
 | `POST` | `/api/todos` | Založení úkolu → `201 Created` + hlavička `Location` |
+| `POST` | `/api/todos/repeat` | Založení týdně se opakujícího úkolu → `201 Created` se všemi výskyty |
 | `PUT` | `/api/todos/{id}` | Úplná aktualizace úkolu |
 | `POST` | `/api/todos/{id}/complete` | Označení úkolu za dokončený |
 | `DELETE` | `/api/todos/{id}` | Smazání úkolu → `204 No Content` |
@@ -74,6 +75,23 @@ API naslouchá na `http://localhost:5258`. Kořen `/` přesměruje na Swagger UI
 
 Chybové odpovědi mají jednotný tvar `ProblemDetails` (RFC 9457).
 Připravené požadavky k odzkoušení jsou v souboru `src/UAI.ZeroVP.API/UAI.ZeroVP.API.http`.
+
+### Týdně se opakující úkol
+
+`POST /api/todos/repeat` přijme běžná pole úkolu (`title`, `description`, `priority`) a navíc:
+
+- `firstDueAtUtc` – termín prvního výskytu ve formátu ISO 8601, např. `2026-10-26T09:00:00Z`;
+  hodnota bez časové zóny se bere jako UTC,
+- `repeatCount` – počet **dalších** opakování po prvním výskytu, 1–52.
+
+`repeatCount: 3` tedy vytvoří čtyři úkoly, každý o sedm dní později. Odpověď `201 Created`
+obsahuje všechny výskyty seřazené podle termínu, hlavička `Location` odkazuje na první z nich.
+Při chybě ve vstupu vrátí API `400 Bad Request` a nevytvoří žádný úkol.
+
+Výskyty jsou samostatné úkoly, ne trvalé pravidlo opakování: dokončení nebo smazání jednoho
+se ostatních nedotkne. Každý úkol má v odpovědi pole `dueAtUtc`; úkoly založené přes
+`POST /api/todos` termín nemají (`null`).
+
 
 ## Swagger
 
@@ -107,6 +125,9 @@ curl http://localhost:5258/api/todos
 curl -X POST http://localhost:5258/api/todos \
   -H "Content-Type: application/json" \
   -d '{"title":"Napsat Dockerfile","priority":"High"}'
+curl -X POST http://localhost:5258/api/todos/repeat \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Týdenní report","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}'
 curl http://localhost:5258/api/info
 ```
 

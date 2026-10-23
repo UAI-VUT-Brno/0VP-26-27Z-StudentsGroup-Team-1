@@ -75,6 +75,44 @@ public sealed class InMemoryTodoRepository : ITodoRepository
         return Task.FromResult(stored.Clone());
     }
 
+       /// <inheritdoc />
+    public Task<IReadOnlyList<TodoItem>> AddRangeAsync(IEnumerable<TodoItem> items, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Kopie a kontroly se udělají předem, aby chybná dávka neuložila nic.
+        var batch = items
+            .Select(item => item?.Clone() ?? throw new ArgumentException("Dávka nesmí obsahovat null.", nameof(items)))
+            .ToList();
+
+        if (batch.DistinctBy(item => item.Id).Count() != batch.Count)
+        {
+            throw new InvalidOperationException("Dávka obsahuje více úkolů se stejným identifikátorem.");
+        }
+
+        var added = new List<TodoItem>(batch.Count);
+        foreach (var stored in batch)
+        {
+            if (!_items.TryAdd(stored.Id, stored))
+            {
+                // Všechno, nebo nic: úkoly z této dávky, které už se uložily, se zase odeberou.
+                foreach (var item in added)
+                {
+                    _items.TryRemove(item.Id, out _);
+                }
+
+                throw new InvalidOperationException($"Úkol s identifikátorem {stored.Id} již existuje.");
+            }
+
+            added.Add(stored);
+        }
+
+        IReadOnlyList<TodoItem> result = added.Select(item => item.Clone()).ToList();
+
+        return Task.FromResult(result);
+    }
+    
     /// <inheritdoc />
     public Task<bool> UpdateAsync(TodoItem item, CancellationToken cancellationToken = default)
     {

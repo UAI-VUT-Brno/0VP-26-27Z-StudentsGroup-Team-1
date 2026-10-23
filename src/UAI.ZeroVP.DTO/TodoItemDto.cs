@@ -25,7 +25,9 @@ public sealed record TodoItemDto
 
     /// <summary>Příznak, zda je úkol hotový.</summary>
     public required bool IsCompleted { get; init; }
-
+    
+    /// <summary>Termín splnění (UTC), nebo <c>null</c> pokud úkol termín nemá.</summary>
+    public required DateTimeOffset? DueAtUtc { get; init; }
     /// <summary>Okamžik vytvoření (UTC).</summary>
     public required DateTimeOffset CreatedAtUtc { get; init; }
 

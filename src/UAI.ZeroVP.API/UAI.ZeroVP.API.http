@@ -41,6 +41,29 @@ Content-Type: application/json
   "priority": "High"
 }
 
+### Týdně se opakující úkol – vytvoří první výskyt a 3 další, vždy o týden později
+POST {{UAI.ZeroVP.API_HostAddress}}/api/todos/repeat
+Content-Type: application/json
+
+{
+  "title": "Týdenní report",
+  "description": "Shrnout, co se za týden udělalo.",
+  "priority": "Normal",
+  "firstDueAtUtc": "2026-10-26T09:00:00Z",
+  "repeatCount": 3
+}
+
+### Opakování mimo rozsah 1–52 – vrátí 400 a nevytvoří žádný úkol
+POST {{UAI.ZeroVP.API_HostAddress}}/api/todos/repeat
+Content-Type: application/json
+
+{
+  "title": "Týdenní report",
+  "firstDueAtUtc": "2026-10-26T09:00:00Z",
+  "repeatCount": 53
+}
+
+
 ### Neexistující úkol – vrátí 404 s ProblemDetails
 GET {{UAI.ZeroVP.API_HostAddress}}/api/todos/00000000-0000-0000-0000-000000000000
 Accept: application/json
