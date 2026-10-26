@@ -23,7 +23,7 @@ v sekci [Výukové materiály k Dockeru](#výukové-materiály-k-dockeru).
 | Projekt | Typ | Obsah | Závislosti |
 |---|---|---|---|
 | `UAI.ZeroVP.DTO` | Class library | Kontrakt API – `TodoItemDto`, `CreateTodoItemRequest`, `CreateRepeatingTodoItemRequest`, `UpdateTodoItemRequest`, `InstanceInfoDto`, výčet `TodoPriority` | žádné |
-| `UAI.ZeroVP.Data` | Class library | Entita `TodoItem`, rozhraní `ITodoRepository`, paměťová implementace `InMemoryTodoRepository`, registrace do DI | `DTO` |
+| `UAI.ZeroVP.Data` | Class library | Entita `TodoItem`, rozhraní `ITodoRepository`, paměťová implementace `InMemoryTodoRepository`, ukládání do souboru JSON, registrace do DI | `DTO` |
 | `UAI.ZeroVP.API` | ASP.NET Core Web API | Kontrolery, mapování entita ↔ DTO, konfigurace pipeline | `DTO`, `Data` |
 
 Závislosti tvoří jednosměrný řetěz **DTO → Data → API**. Kontroler zná jen rozhraní
@@ -31,14 +31,20 @@ Závislosti tvoří jednosměrný řetěz **DTO → Data → API**. Kontroler zn
 
 ## Úložiště dat
 
-Data žijí **pouze v operační paměti procesu** (`ConcurrentDictionary`).
-Zastavením aplikace nebo kontejneru se nenávratně ztratí a každá replika má vlastní,
-na ostatních nezávislou sadu dat. To je záměr a navazuje se na něj:
+Za běhu drží API úkoly v operační paměti procesu (`ConcurrentDictionary`).
+Při zastavení aplikace je uloží do souboru JSON a při dalším startu je z něj znovu načte,
+takže restart přežijí. Výchozí soubor je `data/todos.json` vůči kořeni aplikace;
+cestu mění nastavení `Todo:Storage:FilePath` (v kontejneru `Todo__Storage__FilePath`).
+Prázdná cesta ukládání vypne a data žijí jen v paměti.
+Podrobnosti v [docs/persistence.md](docs/persistence.md).
+
+Soubor si drží každá instance zvlášť, takže v kontejneru bez svazku se data
+s odstraněním kontejneru ztratí a repliky nemají společná data. Navazuje se na to:
 [case study A](case-study-a-dockerfile/) to ukazuje v příkladech 4 a 5 (restart
 kontejneru, replikace za nginx), [case study B](case-study-b-tooling/05-compose/)
-pak protiklad – pojmenovaný svazek, který restart přežije.
+pak pojmenovaný svazek, který odstranění kontejneru přežije.
 
-Při startu se vkládají čtyři ukázkové úkoly. Vypnout je lze nastavením:
+Když soubor ještě neexistuje (nebo je poškozený), vkládají se při startu čtyři ukázkové úkoly. Vypnout je lze nastavením:
 
 ```jsonc
 // appsettings.json
