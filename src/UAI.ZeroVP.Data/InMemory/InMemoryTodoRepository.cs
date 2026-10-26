@@ -23,15 +23,29 @@ public sealed class InMemoryTodoRepository : ITodoRepository
     private readonly TimeProvider _timeProvider;
 
     /// <summary>
-    /// Vytvoří úložiště a volitelně ho naplní ukázkovými daty.
+    /// Vytvoří úložiště a naplní ho buď dodanými úkoly, nebo (volitelně) ukázkovými daty.
     /// </summary>
     /// <param name="options">Nastavení úložiště.</param>
     /// <param name="timeProvider">Zdroj času – umožňuje čas podvrhnout v testech.</param>
-    public InMemoryTodoRepository(InMemoryTodoOptions? options = null, TimeProvider? timeProvider = null)
+    /// <param name="initialItems">
+    /// Úkoly, kterými úložiště začíná – např. načtené ze souboru z minulého běhu.
+    /// Pokud jsou zadané (i prázdný seznam), ukázková data se nevkládají.
+    /// </param>
+    public InMemoryTodoRepository(
+        InMemoryTodoOptions? options = null,
+        TimeProvider? timeProvider = null,
+        IEnumerable<TodoItem>? initialItems = null)
     {
         _timeProvider = timeProvider ?? TimeProvider.System;
 
-        if (options?.SeedSampleData ?? true)
+        if (initialItems is not null)
+        {
+            foreach (var item in initialItems)
+            {
+                _items[item.Id] = item.Clone();
+            }
+        }
+        else if (options?.SeedSampleData ?? true)
         {
             Seed();
         }
