@@ -1,0 +1,2 @@
+# Shellové skripty musí mít LF i po checkoutu na Windows.
+*.sh text eol=lf

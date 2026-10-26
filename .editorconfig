@@ -29,6 +29,10 @@ charset = utf-8
 end_of_line = lf
 indent_size = 2
 
+# Shellové skripty spouští bash; s CRLF by nefungovaly.
+[*.sh]
+end_of_line = lf
+
 [*.md]
 end_of_line = lf
 indent_size = 2
