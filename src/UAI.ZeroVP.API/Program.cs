@@ -4,6 +4,7 @@ using Microsoft.OpenApi;
 using UAI.ZeroVP.API.OpenApi;
 using UAI.ZeroVP.Data.DependencyInjection;
 using UAI.ZeroVP.Data.InMemory;
+using UAI.ZeroVP.Data.JsonFile;
 using Serilog;
 using Serilog.Events;
 
@@ -55,8 +56,26 @@ builder.Services.AddSingleton(TimeProvider.System);
 
 // Datová vrstva: paměťové úložiště. Nastavení se čte ze sekce "Todo",
 // v kontejneru ho lze přepsat proměnnou prostředí Todo__SeedSampleData.
-builder.Services.AddInMemoryTodoData(options =>
-    builder.Configuration.GetSection(InMemoryTodoOptions.SectionName).Bind(options));
+// S vyplněnou cestou Todo:Storage:FilePath se úkoly při startu načtou ze souboru JSON
+// a při zastavení do něj uloží; prázdná cesta = data jen v paměti (např. v testech).
+var configuredTodoFilePath = builder.Configuration[$"{JsonFileTodoOptions.SectionName}:FilePath"];
+
+if (string.IsNullOrWhiteSpace(configuredTodoFilePath))
+{
+    builder.Services.AddInMemoryTodoData(options =>
+        builder.Configuration.GetSection(InMemoryTodoOptions.SectionName).Bind(options));
+}
+else
+{
+    // Relativní cesta se počítá od kořene aplikace, stejně jako u logů.
+    var todoFilePath = Path.IsPathRooted(configuredTodoFilePath)
+        ? configuredTodoFilePath
+        : Path.Combine(builder.Environment.ContentRootPath, configuredTodoFilePath);
+
+    builder.Services.AddJsonFileTodoData(
+        storage => storage.FilePath = todoFilePath,
+        options => builder.Configuration.GetSection(InMemoryTodoOptions.SectionName).Bind(options));
+}
 
 // Kontrola zdraví aplikace – později ji využije HEALTHCHECK v Dockerfile.
 builder.Services.AddHealthChecks();
@@ -72,8 +91,8 @@ builder.Services.AddOpenApi(options =>
         {
             Title = "UAI.ZeroVP – ToDo API",
             Version = "v1",
-            Description = "Ukázkové API pro výuku Dockeru. Data jsou uložena pouze "
-                        + "v paměti procesu a po zastavení kontejneru se ztratí."
+            Description = "Ukázkové API pro výuku Dockeru. Úkoly drží API v paměti "
+                        + "a při zastavení je ukládá do souboru JSON, ze kterého je při startu znovu načte."
         };
 
         return Task.CompletedTask;

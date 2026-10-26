@@ -15,5 +15,8 @@ artifacts/
 ## Uživatelské nastavení aplikace
 appsettings.*.local.json
 
+## Data úkolů uložená při lokálním spuštění
+src/UAI.ZeroVP.API/data/
+
 ## Ostatní
 *.log
