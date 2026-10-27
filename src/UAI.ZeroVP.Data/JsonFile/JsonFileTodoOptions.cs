@@ -13,4 +13,9 @@ public sealed class JsonFileTodoOptions
     /// Absolutní cesta k souboru s úkoly. Prázdná hodnota = bez souboru, data jen v paměti.
     /// </summary>
     public string? FilePath { get; set; }
+
+    /// <summary>
+    /// Jak dlouho operace čeká, než soubor uvolní jiná instance API. Pak skončí chybou.
+    /// </summary>
+    public TimeSpan LockTimeout { get; set; } = TimeSpan.FromSeconds(10);
 }

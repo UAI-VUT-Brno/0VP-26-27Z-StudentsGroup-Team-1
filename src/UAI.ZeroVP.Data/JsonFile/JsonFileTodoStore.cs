@@ -11,8 +11,8 @@ namespace UAI.ZeroVP.Data.JsonFile;
 /// <summary>
 /// Čte a zapisuje úkoly do jednoho souboru JSON, aby přežily restart aplikace či kontejneru.
 /// <para>
-/// Samotná data za běhu dál drží <see cref="InMemory.InMemoryTodoRepository"/>;
-/// soubor se čte jednou při startu a zapisuje při zastavení aplikace.
+/// Soubor čte a zapisuje <see cref="JsonFileTodoRepository"/> při každé operaci, pod zámkem,
+/// takže ho může sdílet víc instancí API. Tato třída sama nic nezamyká.
 /// Chyby čtení a zápisu (práva, plný disk) se podle zadání zatím neošetřují.
 /// </para>
 /// </summary>
@@ -69,7 +69,8 @@ public sealed class JsonFileTodoStore
         try
         {
             var items = Deserialize(File.ReadAllText(_filePath));
-            _logger.LogInformation("Loaded {Count} tasks from {FilePath}.", items.Count, _filePath);
+            // Debug, ne Information: soubor se čte při každém požadavku a log by zahltil.
+            _logger.LogDebug("Loaded {Count} tasks from {FilePath}.", items.Count, _filePath);
             return items;
         }
         catch (JsonException exception)
@@ -106,7 +107,7 @@ public sealed class JsonFileTodoStore
         File.WriteAllText(tempPath, JsonSerializer.Serialize(list, SerializerOptions));
         File.Move(tempPath, _filePath, overwrite: true);
 
-        _logger.LogInformation("Saved {Count} tasks to {FilePath}.", list.Count, _filePath);
+        _logger.LogDebug("Saved {Count} tasks to {FilePath}.", list.Count, _filePath);
     }
 
     /// <summary>

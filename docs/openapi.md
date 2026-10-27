@@ -69,7 +69,7 @@ What the generator cannot read from the code is added by three transformers in `
 | Transformer | What it does |
 |---|---|
 | `HealthCheckDocumentTransformer` | Adds `GET /health`. `MapHealthChecks` does not describe its endpoint for ApiExplorer, so it would be missing. |
-| `ResponsesOperationTransformer` | Removes the empty `application/json` that `[Produces]` adds to responses without a body (`204`) or with another content type (`500`), adds the `Location` header to `201`, and sorts responses by status code. |
+| `ResponsesOperationTransformer` | Removes the empty `application/json` that `[Produces]` adds to responses without a body (`204`) or with another content type (`500`), adds the `Location` header to `201` and the `X-Instance-Id` header to every response, and sorts responses by status code. |
 | `AssumeUtcDateTimeSchemaTransformer` | Sets `type: string` on `firstDueAtUtc`. The property has a custom JSON converter (a value without an offset is read as UTC), and the generator leaves out the type of such properties. |
 
 ## Pitfalls for maintainers
@@ -111,7 +111,7 @@ and reads the document with the `Microsoft.OpenApi` library, the same way client
 | `Operation_DocumentsAllResponses` | Each operation has a summary and exactly the expected status codes, each with a description |
 | `Priority_IsDocumentedAsTheStringsTheApiSends`, `Numbers_AreDocumentedAsIntegersOnly` | Data types match the JSON the API sends |
 | `DateWithCustomConverter_IsDocumentedAsDateTimeString` | `firstDueAtUtc` is documented as a `date-time` string despite its custom converter |
-| `CreatedResponse_DocumentsLocationHeader`, `NoContentResponse_HasNoBody`, `ErrorResponses_UseProblemDetails` | Response headers, bodies and error schemas |
+| `CreatedResponse_DocumentsLocationHeader`, `EveryResponse_DocumentsInstanceHeader`, `NoContentResponse_HasNoBody`, `ErrorResponses_UseProblemDetails` | Response headers, bodies and error schemas |
 | `RequestBody_IsDescribedByTheRequestParameter` | Guards the `<param>` order described above |
 | `Response_MatchesDocument`, `SuccessfulTodoLifecycle_MatchesDocument` | Real requests (success, `400`, `404`, `415`) return a status code, content type and required headers listed in the document |
 | `UnhandledException_ReturnsDocumentedServerError` | With a failing repository the API returns the documented `500` |
