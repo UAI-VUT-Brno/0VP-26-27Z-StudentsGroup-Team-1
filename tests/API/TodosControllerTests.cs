@@ -30,19 +30,21 @@ public sealed class TodosControllerTests
         };
 
     private async Task<TodoItem> AddItemAsync(
-        string title = "Úkol",
-        TodoPriority priority = TodoPriority.Normal,
-        bool isCompleted = false) =>
-        await _repository.AddAsync(new TodoItem
-        {
-            Id = Guid.NewGuid(),
-            Title = title,
-            Priority = priority,
-            IsCompleted = isCompleted,
-            CreatedAtUtc = Now.AddDays(-1),
-            CompletedAtUtc = isCompleted ? Now.AddHours(-1) : null,
-            UpdatedAtUtc = Now.AddDays(-1)
-        });
+    string title = "Úkol",
+    TodoPriority priority = TodoPriority.Normal,
+    bool isCompleted = false,
+    string? userId = null) =>
+    await _repository.AddAsync(new TodoItem
+    {
+        Id = Guid.NewGuid(),
+        UserId = userId,
+        Title = title,
+        Priority = priority,
+        IsCompleted = isCompleted,
+        CreatedAtUtc = Now.AddDays(-1),
+        CompletedAtUtc = isCompleted ? Now.AddHours(-1) : null,
+        UpdatedAtUtc = Now.AddDays(-1)
+    });
 
     /// <summary>Ověří odpověď 200 OK a vrátí její obsah.</summary>
     private static T AssertOk<T>(ActionResult<T> result)
@@ -70,7 +72,7 @@ public sealed class TodosControllerTests
         await AddItemAsync("Low", TodoPriority.Low);
         await AddItemAsync("High", TodoPriority.High);
 
-        var items = AssertOk(await CreateController().GetAll(isCompleted: null, CancellationToken.None));
+        var items = AssertOk(await CreateController().GetAll(userId: null, isCompleted: null, cancellationToken: CancellationToken.None));
 
         Assert.Equal(["High", "Low"], items.Select(item => item.Title));
     }
@@ -78,7 +80,7 @@ public sealed class TodosControllerTests
     [Fact]
     public async Task GetAll_EmptyRepository_ReturnsOkWithEmptyList()
     {
-        var items = AssertOk(await CreateController().GetAll(isCompleted: null, CancellationToken.None));
+        var items = AssertOk(await CreateController().GetAll(userId: null, isCompleted: null, cancellationToken: CancellationToken.None));
 
         Assert.Empty(items);
     }
@@ -91,11 +93,28 @@ public sealed class TodosControllerTests
         await AddItemAsync("Hotový", isCompleted: true);
         await AddItemAsync("Rozdělaný", isCompleted: false);
 
-        var items = AssertOk(await CreateController().GetAll(isCompleted, CancellationToken.None));
+        var items = AssertOk(await CreateController().GetAll(userId: null, isCompleted: isCompleted, cancellationToken: CancellationToken.None));
 
         Assert.Equal(isCompleted, Assert.Single(items).IsCompleted);
     }
 
+    [Fact]
+    public async Task GetAll_UserAndCompletionFilters_ArePassedToRepository()
+    {
+        await AddItemAsync("Alice hotovo", isCompleted: true, userId: "alice");
+        await AddItemAsync("Alice rozdělané", isCompleted: false, userId: "alice");
+        await AddItemAsync("Bob rozdělané", isCompleted: false, userId: "bob");
+
+        var items = AssertOk(await CreateController().GetAll(
+            userId: "alice",
+            isCompleted: false,
+            cancellationToken: CancellationToken.None));
+
+        var item = Assert.Single(items);
+        Assert.Equal("Alice rozdělané", item.Title);
+        Assert.Equal("alice", item.UserId);
+        Assert.False(item.IsCompleted);
+    }
     // --- GET /api/todos/{id} ------------------------------------------------
 
     [Fact]

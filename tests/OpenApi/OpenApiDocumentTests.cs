@@ -108,7 +108,21 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
             }
         }
     }
+    [Fact]
+    public async Task GetAll_DocumentsUserIdQueryParameter()
+    {
+        var operation = GetOperation(
+            await LoadDocumentAsync(),
+            "GET",
+            "/api/todos");
 
+        var userId = Assert.Single(
+            operation.Parameters!,
+            parameter => parameter.Name == "userId");
+
+        Assert.Equal(ParameterLocation.Query, userId.In);
+        Assert.False(userId.Required);
+    }
     // --- Typy a struktura ----------------------------------------------------
 
     [Fact]
