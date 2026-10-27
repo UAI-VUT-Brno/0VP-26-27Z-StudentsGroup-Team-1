@@ -1,0 +1,30 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: uai-zerovp-api:local
+
+    deploy:
+      replicas: 3
+
+    ports:
+      - target: 8080
+        published: "5001-5003"
+        host_ip: 127.0.0.1
+        protocol: tcp
+
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Todo__Storage__FilePath: /app/data/todos.json
+      Todo__SeedSampleData: "false"
+      PersistentLogging__FilePath: /app/logs/uai-zerovp-.log
+      Instance__Name: ""
+
+    volumes:
+      - todo-data:/app/data
+      - api-logs:/app/logs
+
+volumes:
+  todo-data:
+  api-logs:
