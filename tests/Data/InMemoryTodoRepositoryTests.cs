@@ -22,10 +22,11 @@ public sealed class InMemoryTodoRepositoryTests
         TodoPriority priority = TodoPriority.Normal,
         bool isCompleted = false,
         DateTimeOffset? createdAtUtc = null,
-        DateTimeOffset? dueAtUtc = null) => new()
-
+        DateTimeOffset? dueAtUtc = null,
+        string? userId = null) => new()
     {
         Id = Guid.NewGuid(),
+        UserId = userId,
         Title = title,
         Priority = priority,
         IsCompleted = isCompleted,
@@ -333,11 +334,63 @@ public sealed class InMemoryTodoRepositoryTests
         await repository.AddAsync(CreateItem("Hotový", isCompleted: true));
         await repository.AddAsync(CreateItem("Rozdělaný", isCompleted: false));
 
-        var items = await repository.GetAllAsync(isCompleted);
+        var items = await repository.GetAllAsync(isCompleted: isCompleted);
 
         var item = Assert.Single(items);
         Assert.Equal(isCompleted, item.IsCompleted);
     }
+
+[Fact]
+public async Task GetAllAsync_UserFilter_ReturnsOnlyMatchingUser()
+{
+    var repository = CreateEmptyRepository();
+    await repository.AddAsync(CreateItem("Alice", userId: "alice"));
+    await repository.AddAsync(CreateItem("Bob", userId: "bob"));
+
+    var items = await repository.GetAllAsync(userId: "alice");
+
+    var item = Assert.Single(items);
+    Assert.Equal("Alice", item.Title);
+    Assert.Equal("alice", item.UserId);
+}
+
+[Fact]
+public async Task GetAllAsync_UserAndCompletionFilters_ReturnOnlyMatchingItems()
+{
+    var repository = CreateEmptyRepository();
+    await repository.AddAsync(CreateItem("Alice hotovo", isCompleted: true, userId: "alice"));
+    await repository.AddAsync(CreateItem("Alice rozdělané", isCompleted: false, userId: "alice"));
+    await repository.AddAsync(CreateItem("Bob rozdělané", isCompleted: false, userId: "bob"));
+
+    var items = await repository.GetAllAsync(userId: "alice", isCompleted: false);
+
+    var item = Assert.Single(items);
+    Assert.Equal("Alice rozdělané", item.Title);
+    Assert.Equal("alice", item.UserId);
+    Assert.False(item.IsCompleted);
+}
+
+[Fact]
+public async Task GetAllAsync_UnknownUser_ReturnsEmptyList()
+{
+    var repository = CreateEmptyRepository();
+    await repository.AddAsync(CreateItem("Alice", userId: "alice"));
+
+    var items = await repository.GetAllAsync(userId: "nobody");
+
+    Assert.Empty(items);
+}
+
+[Fact]
+public async Task GetAllAsync_UserFilter_IsCaseSensitive()
+{
+    var repository = CreateEmptyRepository();
+    await repository.AddAsync(CreateItem("Alice", userId: "alice"));
+
+    var items = await repository.GetAllAsync(userId: "Alice");
+
+    Assert.Empty(items);
+}
 
     [Fact]
     public async Task GetAllAsync_SortsByPriorityDescendingThenByCreationTime()

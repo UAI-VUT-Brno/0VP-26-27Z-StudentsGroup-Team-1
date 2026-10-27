@@ -77,7 +77,7 @@ Podrobnosti v [docs/multiple-instances.md](docs/multiple-instances.md).
 
 | Metoda | Cesta | Popis |
 |---|---|---|
-| `GET` | `/api/todos` | Seznam úkolů; volitelný filtr `?isCompleted=true\|false` |
+| `GET` | `/api/todos` | Seznam úkolů; volitelné filtry `?userId=<id>` a `?isCompleted=true\|false`,které lze kombinovat |
 | `GET` | `/api/todos/{id}` | Detail úkolu |
 | `POST` | `/api/todos` | Založení úkolu → `201 Created` + hlavička `Location` |
 | `POST` | `/api/todos/repeat` | Založení týdně se opakujícího úkolu → `201 Created` se všemi výskyty |
