@@ -79,7 +79,9 @@ public sealed class TodosController : ControllerBase
         var entity = request.ToEntity(_timeProvider.GetUtcNow());
         var created = await _repository.AddAsync(entity, cancellationToken);
 
-        _logger.LogInformation("Vytvořen úkol {TodoId} ({Title}) pro uživatele {UserId}.", created.Id, created.Title, created.UserId);
+        _logger.LogInformation(
+            "Vytvořen úkol {TodoId} ({Title}) pro uživatele {UserId}.",
+            created.Id, ForLog(created.Title), ForLog(created.UserId));
 
         return CreatedAtRoute(nameof(GetById), new { id = created.Id }, created.ToDto());
     }
@@ -108,7 +110,7 @@ public sealed class TodosController : ControllerBase
 
         _logger.LogInformation(
             "Vytvořen opakovaný úkol ({Title}) pro uživatele {UserId} s {OccurrenceCount} výskyty od {FirstDueAtUtc}.",
-            created[0].Title, created[0].UserId, created.Count, created[0].DueAtUtc);
+            ForLog(created[0].Title), ForLog(created[0].UserId), created.Count, created[0].DueAtUtc);
 
         return CreatedAtRoute(
             nameof(GetById),
@@ -196,6 +198,14 @@ public sealed class TodosController : ControllerBase
 
         return NoContent();
     }
+
+    /// <summary>
+    /// Hodnota od klienta upravená pro zápis do logu: konce řádků se nahradí mezerou.
+    /// Jinak by klient mohl v názvu nebo <c>userId</c> poslat "\n" a do textového logu
+    /// tak podstrčit falešný řádek (log forging, CodeQL <c>cs/log-forging</c>).
+    /// </summary>
+    private static string? ForLog(string? value) =>
+        value?.Replace("\r", " ", StringComparison.Ordinal).Replace("\n", " ", StringComparison.Ordinal);
 
     /// <summary>Jednotná odpověď 404 ve formátu ProblemDetails.</summary>
     private ObjectResult NotFoundTodo(Guid id) => Problem(
