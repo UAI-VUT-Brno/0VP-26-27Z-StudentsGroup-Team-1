@@ -392,8 +392,8 @@ public sealed class TodosControllerTests
     /// </summary>
     private sealed class DeletedBeforeUpdateRepository(ITodoRepository inner) : ITodoRepository
     {
-        public Task<IReadOnlyList<TodoItem>> GetAllAsync(bool? isCompleted = null, CancellationToken cancellationToken = default) =>
-            inner.GetAllAsync(isCompleted, cancellationToken);
+        public Task<IReadOnlyList<TodoItem>> GetAllAsync(string? userId = null, bool? isCompleted = null, CancellationToken cancellationToken = default) =>
+            inner.GetAllAsync(userId, isCompleted, cancellationToken);
 
         public Task<TodoItem?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
             inner.GetByIdAsync(id, cancellationToken);

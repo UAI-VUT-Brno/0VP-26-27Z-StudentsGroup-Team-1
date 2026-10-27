@@ -12,7 +12,8 @@ public interface ITodoRepository
     /// <summary>Vrátí všechny úkoly, volitelně filtrované podle stavu dokončení.</summary>
     /// <param name="isCompleted">Filtr na dokončenost; <c>null</c> = bez filtru.</param>
     /// <param name="cancellationToken">Token pro zrušení operace.</param>
-    Task<IReadOnlyList<TodoItem>> GetAllAsync(bool? isCompleted = null, CancellationToken cancellationToken = default);
+    /// <param name="userId">Filtr podle uživatele; <c>null</c> = bez filtru.</param>
+    Task<IReadOnlyList<TodoItem>> GetAllAsync(string? userId = null, bool? isCompleted = null, CancellationToken cancellationToken = default);
 
     /// <summary>Vrátí úkol podle identifikátoru, nebo <c>null</c> pokud neexistuje.</summary>
     Task<TodoItem?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);

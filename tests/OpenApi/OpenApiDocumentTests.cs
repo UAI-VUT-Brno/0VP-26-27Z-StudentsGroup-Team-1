@@ -345,7 +345,7 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
     {
         private static InvalidOperationException Failure() => new("Simulovaná chyba úložiště.");
 
-        public Task<IReadOnlyList<TodoItem>> GetAllAsync(bool? isCompleted = null, CancellationToken cancellationToken = default) =>
+        public Task<IReadOnlyList<TodoItem>> GetAllAsync(string? userId = null, bool? isCompleted = null, CancellationToken cancellationToken = default) =>
             throw Failure();
 
         public Task<TodoItem?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) => throw Failure();

@@ -42,7 +42,7 @@ public sealed class TodosController : ControllerBase
         [FromQuery] bool? isCompleted,
         CancellationToken cancellationToken)
     {
-        var items = await _repository.GetAllAsync(isCompleted, cancellationToken);
+        var items = await _repository.GetAllAsync(isCompleted: isCompleted, cancellationToken: cancellationToken);
 
         return Ok(items.Select(item => item.ToDto()).ToList());
     }
