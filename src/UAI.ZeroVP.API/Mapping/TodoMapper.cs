@@ -14,6 +14,7 @@ public static class TodoMapper
     public static TodoItemDto ToDto(this TodoItem entity) => new()
     {
         Id = entity.Id,
+        UserId = entity.UserId,
         Title = entity.Title,
         Description = entity.Description,
         Priority = entity.Priority,
@@ -29,6 +30,7 @@ public static class TodoMapper
     public static TodoItem ToEntity(this CreateTodoItemRequest request, DateTimeOffset nowUtc) => new()
     {
         Id = Guid.NewGuid(),
+        UserId = request.UserId.Trim(),
         Title = request.Title.Trim(),
         Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
         Priority = request.Priority,
@@ -41,7 +43,7 @@ public static class TodoMapper
 
     /// <summary>
     /// Vytvoří entitu pro každý výskyt týdně se opakujícího úkolu.
-    /// Výskyty sdílejí název, popis a prioritu, ale každý má vlastní <c>Id</c> a termín.
+    /// Výskyty sdílejí uživatele, název, popis a prioritu, ale každý má vlastní <c>Id</c> a termín.
     /// </summary>
     /// <param name="request">Data z těla požadavku (už zvalidovaná).</param>
     /// <param name="nowUtc">Aktuální čas – předává se zvenčí kvůli testovatelnosti.</param>
@@ -52,6 +54,7 @@ public static class TodoMapper
 
         var template = new CreateTodoItemRequest
         {
+            UserId = request.UserId,
             Title = request.Title,
             Description = request.Description,
             Priority = request.Priority
@@ -68,7 +71,7 @@ public static class TodoMapper
     }
 
     /// <summary>
-    /// Promítne data z požadavku do existující entity.
+    /// Promítne data z požadavku do existující entity. Uživatel se nemění.
     /// Hlídá i přechod stavu dokončení, aby <c>CompletedAtUtc</c> odpovídal příznaku.
     /// </summary>
     public static void ApplyTo(this UpdateTodoItemRequest request, TodoItem entity, DateTimeOffset nowUtc)

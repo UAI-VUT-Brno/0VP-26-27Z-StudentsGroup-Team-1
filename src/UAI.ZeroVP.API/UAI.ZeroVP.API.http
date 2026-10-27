@@ -27,12 +27,13 @@ POST {{UAI.ZeroVP.API_HostAddress}}/api/todos
 Content-Type: application/json
 
 {
+  "userId": "jan.novak",
   "title": "Vyzkoušet docker build",
   "description": "Postavit image z vícefázového Dockerfile.",
   "priority": "High"
 }
 
-### Neplatný vstup – vrátí 400 s ValidationProblemDetails
+### Neplatný vstup – vrátí 400 s ValidationProblemDetails (chybí userId, prázdný název)
 POST {{UAI.ZeroVP.API_HostAddress}}/api/todos
 Content-Type: application/json
 
@@ -46,6 +47,7 @@ POST {{UAI.ZeroVP.API_HostAddress}}/api/todos/repeat
 Content-Type: application/json
 
 {
+  "userId": "jan.novak",
   "title": "Týdenní report",
   "description": "Shrnout, co se za týden udělalo.",
   "priority": "Normal",
@@ -58,6 +60,7 @@ POST {{UAI.ZeroVP.API_HostAddress}}/api/todos/repeat
 Content-Type: application/json
 
 {
+  "userId": "jan.novak",
   "title": "Týdenní report",
   "firstDueAtUtc": "2026-10-26T09:00:00Z",
   "repeatCount": 53

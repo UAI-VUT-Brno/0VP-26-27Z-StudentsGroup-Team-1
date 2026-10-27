@@ -63,6 +63,7 @@ The file uses the same conventions as the API: camelCase property names, the pri
 [
   {
     "id": "f7cb0a24-6f9e-4c54-9b3e-d17843f16b15",
+    "userId": "demo",
     "title": "Napsat Dockerfile",
     "description": "Vícefázový build nad SDK a runtime image.",
     "priority": "High",
@@ -74,6 +75,8 @@ The file uses the same conventions as the API: camelCase property names, the pri
   }
 ]
 ```
+
+`userId` was added later. A file saved before that has no `userId`; such tasks still load and have `userId: null`.
 
 ## Tests
 

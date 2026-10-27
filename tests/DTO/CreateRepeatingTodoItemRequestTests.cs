@@ -13,6 +13,7 @@ public sealed class CreateRepeatingTodoItemRequestTests
 
     private static CreateRepeatingTodoItemRequest CreateValidRequest() => new()
     {
+        UserId = "jan.novak",
         Title = "Týdenní report",
         FirstDueAtUtc = FirstDue,
         RepeatCount = 3
@@ -41,6 +42,25 @@ public sealed class CreateRepeatingTodoItemRequestTests
         var request = CreateValidRequest() with { Title = title! };
 
         AssertSingleErrorFor(request, nameof(CreateRepeatingTodoItemRequest.Title));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Validate_MissingUserId_FailsOnUserId(string? userId)
+    {
+        var request = CreateValidRequest() with { UserId = userId! };
+
+        AssertSingleErrorFor(request, nameof(CreateRepeatingTodoItemRequest.UserId));
+    }
+
+    [Fact]
+    public void Validate_UserIdOverLimit_FailsOnUserId()
+    {
+        var request = CreateValidRequest() with { UserId = new string('u', 101) };
+
+        AssertSingleErrorFor(request, nameof(CreateRepeatingTodoItemRequest.UserId));
     }
 
     [Fact]

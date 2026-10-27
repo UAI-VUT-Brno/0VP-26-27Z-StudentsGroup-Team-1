@@ -16,6 +16,7 @@ public sealed class TodoMapperTests
     private static TodoItem CreateEntity(bool isCompleted = false) => new()
     {
         Id = Guid.NewGuid(),
+        UserId = "jan.novak",
         Title = "Napsat Dockerfile",
         Description = "Vícefázový build.",
         Priority = TodoPriority.High,
@@ -74,7 +75,7 @@ public sealed class TodoMapperTests
     [Fact]
     public void ToEntity_CreatesNewUncompletedItemStampedWithGivenTime()
     {
-        var request = new CreateTodoItemRequest { Title = "Úkol", Priority = TodoPriority.Low };
+        var request = new CreateTodoItemRequest { UserId = "jan.novak", Title = "Úkol", Priority = TodoPriority.Low };
 
         var entity = request.ToEntity(Now);
 
@@ -90,7 +91,7 @@ public sealed class TodoMapperTests
     public void ToEntity_CreatesItemWithoutDueDate()
     {
         // Běžné založení úkolu termín nezná – zůstává zpětně kompatibilní.
-        var request = new CreateTodoItemRequest { Title = "Úkol" };
+        var request = new CreateTodoItemRequest { UserId = "jan.novak", Title = "Úkol" };
 
         Assert.Null(request.ToEntity(Now).DueAtUtc);
     }
@@ -98,18 +99,19 @@ public sealed class TodoMapperTests
     [Fact]
     public void ToEntity_EachCallGeneratesDifferentId()
     {
-        var request = new CreateTodoItemRequest { Title = "Úkol" };
+        var request = new CreateTodoItemRequest { UserId = "jan.novak", Title = "Úkol" };
 
         Assert.NotEqual(request.ToEntity(Now).Id, request.ToEntity(Now).Id);
     }
 
     [Fact]
-    public void ToEntity_TrimsTitleAndDescription()
+    public void ToEntity_TrimsUserIdTitleAndDescription()
     {
-        var request = new CreateTodoItemRequest { Title = "  Úkol  ", Description = "  Popis  " };
+        var request = new CreateTodoItemRequest { UserId = "  jan.novak  ", Title = "  Úkol  ", Description = "  Popis  " };
 
         var entity = request.ToEntity(Now);
 
+        Assert.Equal("jan.novak", entity.UserId);
         Assert.Equal("Úkol", entity.Title);
         Assert.Equal("Popis", entity.Description);
     }
@@ -120,7 +122,7 @@ public sealed class TodoMapperTests
     [InlineData("   ")]
     public void ToEntity_BlankDescription_BecomesNull(string? description)
     {
-        var request = new CreateTodoItemRequest { Title = "Úkol", Description = description };
+        var request = new CreateTodoItemRequest { UserId = "jan.novak", Title = "Úkol", Description = description };
 
         Assert.Null(request.ToEntity(Now).Description);
     }
@@ -131,6 +133,7 @@ public sealed class TodoMapperTests
 
     private static CreateRepeatingTodoItemRequest CreateRepeatingRequest(int repeatCount = 3) => new()
     {
+        UserId = "  jan.novak  ",
         Title = "  Týdenní report  ",
         Description = "  Shrnout týden.  ",
         Priority = TodoPriority.High,
@@ -154,6 +157,14 @@ public sealed class TodoMapperTests
         Assert.Equal(
             [FirstDue, FirstDue.AddDays(7), FirstDue.AddDays(14), FirstDue.AddDays(21)],
             entities.Select(entity => entity.DueAtUtc));
+    }
+
+    [Fact]
+    public void ToEntities_EveryOccurrenceBelongsToTheUser()
+    {
+        var entities = CreateRepeatingRequest().ToEntities(Now);
+
+        Assert.All(entities, entity => Assert.Equal("jan.novak", entity.UserId));
     }
 
     [Fact]
@@ -220,6 +231,16 @@ public sealed class TodoMapperTests
         Assert.Equal("Nový popis", entity.Description);
         Assert.Equal(TodoPriority.Low, entity.Priority);
         Assert.Equal(Now, entity.UpdatedAtUtc);
+    }
+
+    [Fact]
+    public void ApplyTo_KeepsTheUser()
+    {
+        var entity = CreateEntity();
+
+        new UpdateTodoItemRequest { Title = "Úkol" }.ApplyTo(entity, Now);
+
+        Assert.Equal("jan.novak", entity.UserId);
     }
 
     [Theory]

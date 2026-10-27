@@ -12,7 +12,7 @@ namespace UAI.ZeroVP.Tests.API;
 public sealed class RepeatingTodosEndpointTests : IClassFixture<ApiTestFactory>
 {
     private const string ValidBody =
-        """{"title":"Týdenní report","priority":"High","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""";
+        """{"userId":"jan.novak","title":"Týdenní report","priority":"High","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""";
 
     private readonly HttpClient _client;
 
@@ -33,6 +33,7 @@ public sealed class RepeatingTodosEndpointTests : IClassFixture<ApiTestFactory>
         Assert.Equal(4, occurrences.Select(occurrence => occurrence.GetProperty("id").GetGuid()).Distinct().Count());
         Assert.All(occurrences, occurrence =>
         {
+            Assert.Equal("jan.novak", occurrence.GetProperty("userId").GetString());
             Assert.Equal("Týdenní report", occurrence.GetProperty("title").GetString());
             Assert.Equal("High", occurrence.GetProperty("priority").GetString());
             Assert.False(occurrence.GetProperty("isCompleted").GetBoolean());
@@ -68,16 +69,18 @@ public sealed class RepeatingTodosEndpointTests : IClassFixture<ApiTestFactory>
     {
         // { tělo požadavku, klíč v "errors" odpovědi 400 }
         { """{"firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""",                       "Title" },
-        { """{"title":"","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""",            "Title" },
-        { """{"title":"Úkol","priority":"Urgent","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""", "$.priority" },
-        { """{"title":"Úkol","repeatCount":3}""",                                               "FirstDueAtUtc" },
-        { """{"title":"Úkol","firstDueAtUtc":null,"repeatCount":3}""",                          "FirstDueAtUtc" },
-        { """{"title":"Úkol","firstDueAtUtc":"zítra","repeatCount":3}""",                       "$.firstDueAtUtc" },
-        { """{"title":"Úkol","firstDueAtUtc":"9999-12-30T00:00:00Z","repeatCount":3}""",        "FirstDueAtUtc" },
-        { """{"title":"Úkol","firstDueAtUtc":"2026-10-26T09:00:00Z"}""",                        "RepeatCount" },
-        { """{"title":"Úkol","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":0}""",        "RepeatCount" },
-        { """{"title":"Úkol","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":53}""",       "RepeatCount" },
-        { """{"title":"Úkol","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":"3"}""",      "$.repeatCount" }
+        { """{"userId":"jan.novak","title":"","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""",            "Title" },
+        { """{"title":"Úkol","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""",                        "UserId" },
+        { """{"userId":" ","title":"Úkol","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""",           "UserId" },
+        { """{"userId":"jan.novak","title":"Úkol","priority":"Urgent","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""", "$.priority" },
+        { """{"userId":"jan.novak","title":"Úkol","repeatCount":3}""",                                               "FirstDueAtUtc" },
+        { """{"userId":"jan.novak","title":"Úkol","firstDueAtUtc":null,"repeatCount":3}""",                          "FirstDueAtUtc" },
+        { """{"userId":"jan.novak","title":"Úkol","firstDueAtUtc":"zítra","repeatCount":3}""",                       "$.firstDueAtUtc" },
+        { """{"userId":"jan.novak","title":"Úkol","firstDueAtUtc":"9999-12-30T00:00:00Z","repeatCount":3}""",        "FirstDueAtUtc" },
+        { """{"userId":"jan.novak","title":"Úkol","firstDueAtUtc":"2026-10-26T09:00:00Z"}""",                        "RepeatCount" },
+        { """{"userId":"jan.novak","title":"Úkol","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":0}""",        "RepeatCount" },
+        { """{"userId":"jan.novak","title":"Úkol","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":53}""",       "RepeatCount" },
+        { """{"userId":"jan.novak","title":"Úkol","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":"3"}""",      "$.repeatCount" }
     };
 
     [Theory]
@@ -101,7 +104,7 @@ public sealed class RepeatingTodosEndpointTests : IClassFixture<ApiTestFactory>
     public async Task PostTodo_WithoutDueDate_ReturnsDueAtUtcNull()
     {
         // Běžné založení úkolu zůstává kompatibilní; nové pole se posílá vždy, i s null.
-        using var response = await PostJsonAsync("/api/todos", """{"title":"Úkol"}""");
+        using var response = await PostJsonAsync("/api/todos", """{"userId":"jan.novak","title":"Úkol"}""");
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         using var json = await ReadJsonAsync(response);

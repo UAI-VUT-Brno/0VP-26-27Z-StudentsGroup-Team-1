@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Time.Testing;
 using UAI.ZeroVP.API.Controllers;
 using UAI.ZeroVP.Data.Abstractions;
@@ -158,6 +159,29 @@ public sealed class TodosControllerTests
 
         var dto = Assert.IsType<TodoItemDto>(Assert.IsType<CreatedAtRouteResult>(result.Result).Value);
         Assert.Null(dto.DueAtUtc);
+    }
+
+    [Fact]
+    public async Task Create_LineBreaksFromClient_DoNotReachTheLog()
+    {
+        // Konec řádku v názvu nebo userId by do textového logu podstrčil falešný řádek.
+        var logger = new FakeLogger<TodosController>();
+        var controller = new TodosController(_repository, _timeProvider, logger)
+        {
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
+        };
+        var request = new CreateTodoItemRequest
+        {
+            UserId = "jan\r\n2026-10-27 [ERR] falešný řádek",
+            Title = "Úkol\nfalešný řádek"
+        };
+
+        await controller.Create(request, CancellationToken.None);
+
+        var message = logger.LatestRecord.Message;
+        Assert.DoesNotContain('\n', message);
+        Assert.DoesNotContain('\r', message);
+        Assert.Contains("Úkol falešný řádek", message);
     }
 
     // --- POST /api/todos/repeat ---------------------------------------------
