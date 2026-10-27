@@ -42,8 +42,10 @@ builder.Services.AddSerilog((services, loggerConfiguration) =>
             sinks.File(
                 logFilePath,
                 rollingInterval: RollingInterval.Day,
+                shared: true,
                 outputTemplate:
                     "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{InstanceName}] [{SourceContext}] {Message:lj}{NewLine}{Exception}");
+            
         });
 });
 

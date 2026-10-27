@@ -9,7 +9,6 @@ public sealed record InstanceInfoDto
     /// <summary>Jméno instance z nastavení <c>Instance:Name</c>; stejné jako hlavička <c>X-Instance-Id</c>.</summary>
     public required string InstanceName { get; init; }
 
-
     /// <summary>Jméno stroje – v kontejneru odpovídá jeho hostname (zkrácené ID kontejneru).</summary>
     public required string MachineName { get; init; }
 
