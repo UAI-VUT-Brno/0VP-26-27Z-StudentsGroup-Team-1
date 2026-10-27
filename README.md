@@ -131,6 +131,19 @@ curl -X POST http://localhost:5258/api/todos/repeat \
 curl http://localhost:5258/api/info
 ```
 
+## Bezpečnostní kontroly
+
+Každý build hlídá zranitelné NuGet balíčky (NuGet Audit) a bezpečnostní pravidla
+analyzátorů .NET. Workflow `Security` v GitHub Actions k tomu přidává hledání tajných
+údajů (gitleaks), CodeQL a kontrolu závislostí v pull requestech. Stejné kontroly
+lze spustit lokálně:
+
+```bash
+./scripts/security-scan.sh
+```
+
+Podrobnosti v [docs/security-scanning.md](docs/security-scanning.md).
+
 ## Poznámka ke kódování
 
 Zdrojové soubory jsou uloženy jako **UTF-8 s BOM**. Bez BOM dekóduje kompilátor C#
