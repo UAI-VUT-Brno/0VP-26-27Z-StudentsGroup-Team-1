@@ -4,8 +4,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 namespace UAI.ZeroVP.Tests.API;
 
 /// <summary>
-/// API pro testy přes HTTP. Úložiště začíná prázdné (bez ukázkových úkolů)
-/// a logy se zapisují do dočasné složky systému, ne do <c>src/UAI.ZeroVP.API/logs/</c>.
+/// API pro testy přes HTTP. Úložiště začíná prázdné (bez ukázkových úkolů), úkoly se neukládají
+/// do souboru a logy se zapisují do dočasné složky systému, ne do <c>src/UAI.ZeroVP.API/logs/</c>.
 /// </summary>
 public sealed class ApiTestFactory : WebApplicationFactory<Program>
 {
@@ -15,6 +15,7 @@ public sealed class ApiTestFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("PersistentLogging:FilePath", Path.Combine(LogDirectory, "uai-zerovp-.log"));
+        builder.UseSetting("Todo:Storage:FilePath", "");
         builder.UseSetting("Todo:SeedSampleData", "false");
     }
 }

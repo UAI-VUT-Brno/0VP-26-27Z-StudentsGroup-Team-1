@@ -61,6 +61,43 @@ public sealed class InMemoryTodoRepositoryTests
     }
 
     [Fact]
+    public async Task Constructor_InitialItems_StoresThemInsteadOfSampleData()
+    {
+        var first = CreateItem("První");
+        var second = CreateItem("Druhý", dueAtUtc: Now.AddDays(1));
+
+        var repository = new InMemoryTodoRepository(
+            new InMemoryTodoOptions { SeedSampleData = true },
+            initialItems: [first, second]);
+
+        var items = await repository.GetAllAsync();
+        Assert.Equal(2, items.Count);
+        Assert.Equal(second.DueAtUtc, (await repository.GetByIdAsync(second.Id))!.DueAtUtc);
+    }
+
+    [Fact]
+    public async Task Constructor_EmptyInitialItems_DoesNotSeed()
+    {
+        // Prázdný soubor z minulého běhu znamená "uživatel vše smazal", ne "začni od nuly".
+        var repository = new InMemoryTodoRepository(
+            new InMemoryTodoOptions { SeedSampleData = true },
+            initialItems: []);
+
+        Assert.Equal(0, await repository.CountAsync());
+    }
+
+    [Fact]
+    public async Task Constructor_InitialItems_AreCopied()
+    {
+        var item = CreateItem("Původní název");
+        var repository = new InMemoryTodoRepository(initialItems: [item]);
+
+        item.Title = "Změněno zvenčí";
+
+        Assert.Equal("Původní název", (await repository.GetByIdAsync(item.Id))!.Title);
+    }
+
+    [Fact]
     public async Task Constructor_Seed_UsesInjectedTimeProvider()
     {
         var timeProvider = new FakeTimeProvider(Now);
