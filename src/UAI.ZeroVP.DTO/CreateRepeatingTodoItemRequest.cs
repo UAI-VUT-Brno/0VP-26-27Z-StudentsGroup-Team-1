@@ -11,7 +11,7 @@ namespace UAI.ZeroVP.DTO;
 /// Každý výskyt je samostatný úkol – nejde o trvalé pravidlo opakování.
 /// </summary>
 /// <remarks>
-/// Pravidla pro název, popis a prioritu musí odpovídat <see cref="CreateTodoItemRequest"/>.
+/// Pravidla pro uživatele, název, popis a prioritu musí odpovídat <see cref="CreateTodoItemRequest"/>.
 /// </remarks>
 public sealed record CreateRepeatingTodoItemRequest : IValidatableObject
 {
@@ -23,6 +23,18 @@ public sealed record CreateRepeatingTodoItemRequest : IValidatableObject
 
     /// <summary>Počet dní mezi dvěma výskyty.</summary>
     public const int DaysBetweenOccurrences = 7;
+
+    /// <summary>
+    /// Identifikátor uživatele, kterému úkol patří – jméno, ID nebo e-mail. Povinný, 1–100 znaků,
+    /// mezery na okrajích se odříznou. API ho zatím nijak neověřuje. Po založení se už nedá změnit.
+    /// </summary>
+    /// <remarks>
+    /// Bez klíčového slova <c>required</c> ze stejného důvodu jako u <c>Title</c>.
+    /// </remarks>
+    /// <example>jan.novak</example>
+    [Required(AllowEmptyStrings = false, ErrorMessage = "Identifikátor uživatele je povinný.")]
+    [StringLength(100, MinimumLength = 1, ErrorMessage = "Identifikátor uživatele musí mít 1 až 100 znaků.")]
+    public string UserId { get; init; } = string.Empty;
 
     /// <summary>Krátký název úkolu. Povinný, 1–200 znaků.</summary>
     /// <remarks>

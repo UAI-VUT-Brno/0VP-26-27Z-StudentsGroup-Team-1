@@ -15,6 +15,7 @@ public sealed class TodoItemTests
     private static TodoItem CreateFullyPopulatedItem() => new()
     {
         Id = Guid.NewGuid(),
+        UserId = "jan.novak",
         Title = "Napsat Dockerfile",
         Description = "Vícefázový build.",
         Priority = TodoPriority.High,
@@ -33,6 +34,7 @@ public sealed class TodoItemTests
         var clone = original.Clone();
 
         Assert.Equal(original.Id, clone.Id);
+        Assert.Equal(original.UserId, clone.UserId);
         Assert.Equal(original.Title, clone.Title);
         Assert.Equal(original.Description, clone.Description);
         Assert.Equal(original.Priority, clone.Priority);

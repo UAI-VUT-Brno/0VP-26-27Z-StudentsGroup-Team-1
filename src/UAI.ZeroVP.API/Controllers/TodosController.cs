@@ -79,7 +79,7 @@ public sealed class TodosController : ControllerBase
         var entity = request.ToEntity(_timeProvider.GetUtcNow());
         var created = await _repository.AddAsync(entity, cancellationToken);
 
-        _logger.LogInformation("Vytvořen úkol {TodoId} ({Title}).", created.Id, created.Title);
+        _logger.LogInformation("Vytvořen úkol {TodoId} ({Title}) pro uživatele {UserId}.", created.Id, created.Title, created.UserId);
 
         return CreatedAtRoute(nameof(GetById), new { id = created.Id }, created.ToDto());
     }
@@ -107,8 +107,8 @@ public sealed class TodosController : ControllerBase
         var created = await _repository.AddRangeAsync(entities, cancellationToken);
 
         _logger.LogInformation(
-            "Vytvořen opakovaný úkol ({Title}) s {OccurrenceCount} výskyty od {FirstDueAtUtc}.",
-            created[0].Title, created.Count, created[0].DueAtUtc);
+            "Vytvořen opakovaný úkol ({Title}) pro uživatele {UserId} s {OccurrenceCount} výskyty od {FirstDueAtUtc}.",
+            created[0].Title, created[0].UserId, created.Count, created[0].DueAtUtc);
 
         return CreatedAtRoute(
             nameof(GetById),
@@ -121,6 +121,7 @@ public sealed class TodosController : ControllerBase
     /// <remarks>
     /// Jde o úplnou aktualizaci: hodnota, která v těle chybí, se nastaví na výchozí
     /// (<c>description</c> na <c>null</c>, <c>priority</c> na <c>Normal</c>, <c>isCompleted</c> na <c>false</c>).
+    /// Uživatel, kterému úkol patří (<c>userId</c>), se nemění.
     /// </remarks>
     /// <param name="id">Identifikátor úkolu.</param>
     /// <param name="cancellationToken">Token pro zrušení operace.</param>

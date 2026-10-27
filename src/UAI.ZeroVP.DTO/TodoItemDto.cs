@@ -14,6 +14,13 @@ public sealed record TodoItemDto
     /// <summary>Jednoznačný identifikátor úkolu.</summary>
     public required Guid Id { get; init; }
 
+    /// <summary>
+    /// Identifikátor uživatele, kterému úkol patří. <c>null</c> mají jen úkoly
+    /// založené před zavedením uživatelů.
+    /// </summary>
+    /// <example>jan.novak</example>
+    public required string? UserId { get; init; }
+
     /// <summary>Krátký název úkolu.</summary>
     public required string Title { get; init; }
 

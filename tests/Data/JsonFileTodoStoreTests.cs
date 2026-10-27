@@ -65,6 +65,7 @@ public sealed class JsonFileTodoStoreTests : IDisposable
         var item = new TodoItem
         {
             Id = Guid.NewGuid(),
+            UserId = "jan.novak",
             Title = "Napsat Dockerfile",
             Description = "Vícefázový build",
             Priority = TodoPriority.High,
@@ -79,6 +80,18 @@ public sealed class JsonFileTodoStoreTests : IDisposable
         var loaded = Assert.Single(CreateStore().Load()!);
 
         Assert.Equivalent(item, loaded, strict: true);
+    }
+
+    [Fact]
+    public void Load_FileFromBeforeUsers_LoadsTasksWithoutUser()
+    {
+        // Soubor uložený před zavedením userId toto pole nemá – úkoly se musí načíst dál.
+        WriteFile("""[{"id": "0f8fad5b-d9cb-469f-a165-70867728950e", "title": "Starý úkol", "createdAtUtc": "2026-10-26T12:00:00Z"}]""");
+
+        var loaded = Assert.Single(CreateStore().Load()!);
+
+        Assert.Equal("Starý úkol", loaded.Title);
+        Assert.Null(loaded.UserId);
     }
 
     [Fact]

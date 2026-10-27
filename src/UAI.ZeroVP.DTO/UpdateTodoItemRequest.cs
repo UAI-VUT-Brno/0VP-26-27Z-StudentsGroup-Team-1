@@ -6,6 +6,7 @@ namespace UAI.ZeroVP.DTO;
 /// <summary>
 /// Vstup pro úplnou aktualizaci úkolu (HTTP PUT /api/todos/{id}).
 /// Jde o "full update" – neposlané hodnoty se přepíší výchozími.
+/// Uživatel, kterému úkol patří, se změnit nedá; pole <c>userId</c> se v těle ignoruje.
 /// </summary>
 public sealed record UpdateTodoItemRequest
 {

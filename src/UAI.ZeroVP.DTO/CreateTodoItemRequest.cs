@@ -9,6 +9,18 @@ namespace UAI.ZeroVP.DTO;
 /// </summary>
 public sealed record CreateTodoItemRequest
 {
+    /// <summary>
+    /// Identifikátor uživatele, kterému úkol patří – jméno, ID nebo e-mail. Povinný, 1–100 znaků,
+    /// mezery na okrajích se odříznou. API ho zatím nijak neověřuje. Po založení se už nedá změnit.
+    /// </summary>
+    /// <remarks>
+    /// Bez klíčového slova <c>required</c> ze stejného důvodu jako u <c>Title</c>.
+    /// </remarks>
+    /// <example>jan.novak</example>
+    [Required(AllowEmptyStrings = false, ErrorMessage = "Identifikátor uživatele je povinný.")]
+    [StringLength(100, MinimumLength = 1, ErrorMessage = "Identifikátor uživatele musí mít 1 až 100 znaků.")]
+    public string UserId { get; init; } = string.Empty;
+
     /// <summary>Krátký název úkolu. Povinný, 1–200 znaků.</summary>
     /// <remarks>
     /// Záměrně bez klíčového slova <c>required</c>: to vynucuje už deserializace JSON,

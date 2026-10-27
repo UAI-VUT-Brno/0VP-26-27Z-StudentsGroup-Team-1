@@ -82,9 +82,17 @@ API naslouchá na `http://localhost:5258`. Kořen `/` přesměruje na Swagger UI
 Chybové odpovědi mají jednotný tvar `ProblemDetails` (RFC 9457).
 Připravené požadavky k odzkoušení jsou v souboru `src/UAI.ZeroVP.API/UAI.ZeroVP.API.http`.
 
+### Uživatel úkolu
+
+Každý úkol patří uživateli. `POST /api/todos` i `POST /api/todos/repeat` vyžadují pole `userId`
+(jméno, ID nebo e-mail, 1–100 znaků, mezery na okrajích se odříznou); chybějící nebo prázdná hodnota
+vrátí `400`. Všechny odpovědi s úkolem `userId` obsahují. Uživatel se po založení nemění –
+`PUT /api/todos/{id}` pole `userId` ignoruje. Zatím jde jen o řetězec bez ověření (žádné přihlášení).
+Ukázkové úkoly patří uživateli `demo`, úkoly ze souboru uloženého před zavedením uživatelů mají `userId: null`.
+
 ### Týdně se opakující úkol
 
-`POST /api/todos/repeat` přijme běžná pole úkolu (`title`, `description`, `priority`) a navíc:
+`POST /api/todos/repeat` přijme běžná pole úkolu (`userId`, `title`, `description`, `priority`) a navíc:
 
 - `firstDueAtUtc` – termín prvního výskytu ve formátu ISO 8601, např. `2026-10-26T09:00:00Z`;
   hodnota bez časové zóny se bere jako UTC,
@@ -130,10 +138,10 @@ ASPNETCORE_ENVIRONMENT=Production Swagger__Enabled=true dotnet UAI.ZeroVP.API.dl
 curl http://localhost:5258/api/todos
 curl -X POST http://localhost:5258/api/todos \
   -H "Content-Type: application/json" \
-  -d '{"title":"Napsat Dockerfile","priority":"High"}'
+  -d '{"userId":"jan.novak","title":"Napsat Dockerfile","priority":"High"}'
 curl -X POST http://localhost:5258/api/todos/repeat \
   -H "Content-Type: application/json" \
-  -d '{"title":"Týdenní report","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}'
+  -d '{"userId":"jan.novak","title":"Týdenní report","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}'
 curl http://localhost:5258/api/info
 ```
 

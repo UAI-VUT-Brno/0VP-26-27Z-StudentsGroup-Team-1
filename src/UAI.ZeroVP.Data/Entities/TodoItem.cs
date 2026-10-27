@@ -12,6 +12,12 @@ public sealed class TodoItem
     /// <summary>Jednoznačný identifikátor úkolu.</summary>
     public required Guid Id { get; init; }
 
+    /// <summary>
+    /// Identifikátor uživatele, kterému úkol patří. Nastaví se při založení a už se nemění.
+    /// <c>null</c> mají jen úkoly ze souboru uloženého před zavedením uživatelů.
+    /// </summary>
+    public string? UserId { get; init; }
+
     /// <summary>Krátký název úkolu.</summary>
     public required string Title { get; set; }
 
@@ -44,6 +50,7 @@ public sealed class TodoItem
     public TodoItem Clone() => new()
     {
         Id = Id,
+        UserId = UserId,
         Title = Title,
         Description = Description,
         Priority = Priority,

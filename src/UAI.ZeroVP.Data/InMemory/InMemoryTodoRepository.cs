@@ -166,6 +166,9 @@ public sealed class InMemoryTodoRepository : ITodoRepository
         return Task.FromResult(_items.Count);
     }
 
+    /// <summary>Uživatel, kterému patří ukázkové úkoly.</summary>
+    public const string SampleUserId = "demo";
+
     /// <summary>Vloží ukázkové úkoly, aby API hned po startu nevracelo prázdný seznam.</summary>
     private void Seed()
     {
@@ -182,6 +185,7 @@ public sealed class InMemoryTodoRepository : ITodoRepository
         var item = new TodoItem
         {
             Id = Guid.NewGuid(),
+            UserId = SampleUserId,
             Title = title,
             Description = description,
             Priority = priority,
