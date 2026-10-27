@@ -56,8 +56,8 @@ builder.Services.AddSingleton(TimeProvider.System);
 
 // Datová vrstva: paměťové úložiště. Nastavení se čte ze sekce "Todo",
 // v kontejneru ho lze přepsat proměnnou prostředí Todo__SeedSampleData.
-// S vyplněnou cestou Todo:Storage:FilePath se úkoly při startu načtou ze souboru JSON
-// a při zastavení do něj uloží; prázdná cesta = data jen v paměti (např. v testech).
+// S vyplněnou cestou Todo:Storage:FilePath se úkoly čtou a ukládají do souboru JSON při každé
+// operaci, takže ho může sdílet víc instancí API; prázdná cesta = data jen v paměti (např. v testech).
 var configuredTodoFilePath = builder.Configuration[$"{JsonFileTodoOptions.SectionName}:FilePath"];
 
 if (string.IsNullOrWhiteSpace(configuredTodoFilePath))
@@ -91,8 +91,8 @@ builder.Services.AddOpenApi(options =>
         {
             Title = "UAI.ZeroVP – ToDo API",
             Version = "v1",
-            Description = "Ukázkové API pro výuku Dockeru. Úkoly drží API v paměti "
-                        + "a při zastavení je ukládá do souboru JSON, ze kterého je při startu znovu načte."
+            Description = "Ukázkové API pro výuku Dockeru. Úkoly ukládá do souboru JSON, "
+                        + "který může sdílet několik běžících instancí API."
         };
 
         return Task.CompletedTask;

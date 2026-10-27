@@ -5,13 +5,12 @@ using Microsoft.Extensions.Logging.Testing;
 using UAI.ZeroVP.Data.Abstractions;
 using UAI.ZeroVP.Data.DependencyInjection;
 using UAI.ZeroVP.Data.Entities;
-using UAI.ZeroVP.Data.InMemory;
 using UAI.ZeroVP.Data.JsonFile;
 
 namespace UAI.ZeroVP.Tests.Data;
 
 /// <summary>
-/// Registrace úložiště se souborem JSON a jeho napojení na start a zastavení aplikace.
+/// Registrace úložiště se souborem JSON a jeho chování během života aplikace.
 /// Restart se simuluje tak, že se zastaví jeden host a nad stejným souborem se spustí nový.
 /// </summary>
 public sealed class JsonFileTodoDataTests : IDisposable
@@ -46,16 +45,19 @@ public sealed class JsonFileTodoDataTests : IDisposable
     };
 
     // --- Registrace ---------------------------------------------------------
-
     [Fact]
-    public void AddJsonFileTodoData_RegistersInMemoryRepositoryAndPersistenceService()
+    public void AddJsonFileTodoData_RegistersSharedFileRepositoryAsSingleton()
     {
         using var provider = new ServiceCollection()
             .AddJsonFileTodoData(storage => storage.FilePath = FilePath)
             .BuildServiceProvider();
 
-        Assert.IsType<InMemoryTodoRepository>(provider.GetRequiredService<ITodoRepository>());
-        Assert.Contains(provider.GetServices<IHostedService>(), service => service is JsonFileTodoPersistenceService);
+        using var firstScope = provider.CreateScope();
+        using var secondScope = provider.CreateScope();
+        var repository = firstScope.ServiceProvider.GetRequiredService<ITodoRepository>();
+
+        Assert.IsType<JsonFileTodoRepository>(repository);
+        Assert.Same(repository, secondScope.ServiceProvider.GetRequiredService<ITodoRepository>());
     }
 
     [Theory]
@@ -93,6 +95,22 @@ public sealed class JsonFileTodoDataTests : IDisposable
     }
 
     // --- Životní cyklus aplikace ----------------------------------------------
+
+    [Fact]
+    public async Task Add_IsInTheFileImmediately_WithoutStoppingTheApplication()
+    {
+        var item = CreateItem("Hned v souboru");
+
+        using var host = CreateHost();
+        await host.StartAsync();
+        await host.Services.GetRequiredService<ITodoRepository>().AddAsync(item);
+
+        var saved = new JsonFileTodoStore(new JsonFileTodoOptions { FilePath = FilePath }, new FakeLogger<JsonFileTodoStore>())
+            .Load();
+        await host.StopAsync();
+
+        Assert.Equal(item.Id, Assert.Single(saved!).Id);
+    }
 
     [Fact]
     public async Task Stop_SavesTasks_AndNextStartLoadsThem()

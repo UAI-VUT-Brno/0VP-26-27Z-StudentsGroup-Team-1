@@ -40,8 +40,8 @@ public static class DataServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Zaregistruje paměťové úložiště úkolů, které se při startu aplikace naplní ze souboru JSON
-    /// a při jejím zastavení do něj uloží.
+    /// Zaregistruje úložiště úkolů nad souborem JSON. Soubor se čte a zapisuje při každé
+    /// operaci pod zámkem, takže ho může sdílet několik instancí API najednou.
     /// <para>
     /// Když soubor neexistuje nebo je poškozený, začíná se od nuly – s ukázkovými daty,
     /// pokud jsou v <see cref="InMemoryTodoOptions"/> zapnutá.
@@ -71,11 +71,13 @@ public static class DataServiceCollectionExtensions
             sp.GetRequiredService<JsonFileTodoOptions>(),
             sp.GetService<ILogger<JsonFileTodoStore>>() ?? NullLogger<JsonFileTodoStore>.Instance,
             sp.GetService<TimeProvider>()));
-        services.AddSingleton<ITodoRepository>(sp => new InMemoryTodoRepository(
+
+        // Singleton kvůli zámku uvnitř procesu: všechny požadavky musí čekat na tentýž.
+        services.AddSingleton<ITodoRepository>(sp => new JsonFileTodoRepository(
+            sp.GetRequiredService<JsonFileTodoStore>(),
+            sp.GetRequiredService<JsonFileTodoOptions>(),
             sp.GetRequiredService<InMemoryTodoOptions>(),
-            sp.GetService<TimeProvider>(),
-            sp.GetRequiredService<JsonFileTodoStore>().Load()));
-        services.AddHostedService<JsonFileTodoPersistenceService>();
+            sp.GetService<TimeProvider>()));
 
         return services;
     }
