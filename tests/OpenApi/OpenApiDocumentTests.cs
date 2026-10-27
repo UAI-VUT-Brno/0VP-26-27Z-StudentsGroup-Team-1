@@ -147,6 +147,19 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
         Assert.True(header.Required);
     }
 
+    [Theory]
+    [InlineData("GET", "/api/info", "200")]
+    [InlineData("GET", "/api/todos/{id}", "404")]
+    [InlineData("DELETE", "/api/todos/{id}", "204")]
+    public async Task EveryResponse_DocumentsInstanceHeader(string method, string path, string statusCode)
+    {
+        var response = GetOperation(await LoadDocumentAsync(), method, path).Responses![statusCode];
+
+        Assert.True(response.Headers!.TryGetValue("X-Instance-Id", out var header));
+        Assert.True(header.Required);
+    }
+
+
     [Fact]
     public async Task NoContentResponse_HasNoBody()
     {

@@ -31,15 +31,15 @@ Závislosti tvoří jednosměrný řetěz **DTO → Data → API**. Kontroler zn
 
 ## Úložiště dat
 
-Za běhu drží API úkoly v operační paměti procesu (`ConcurrentDictionary`).
-Při zastavení aplikace je uloží do souboru JSON a při dalším startu je z něj znovu načte,
-takže restart přežijí. Výchozí soubor je `data/todos.json` vůči kořeni aplikace;
+API ukládá úkoly do souboru JSON. Každá operace si soubor zamkne, přečte, provede změnu
+a hned ho uloží, takže úkoly přežijí restart a soubor může sdílet několik běžících instancí.
+Výchozí soubor je `data/todos.json` vůči kořeni aplikace;
 cestu mění nastavení `Todo:Storage:FilePath` (v kontejneru `Todo__Storage__FilePath`).
 Prázdná cesta ukládání vypne a data žijí jen v paměti.
 Podrobnosti v [docs/persistence.md](docs/persistence.md).
 
-Soubor si drží každá instance zvlášť, takže v kontejneru bez svazku se data
-s odstraněním kontejneru ztratí a repliky nemají společná data. Navazuje se na to:
+V kontejneru bez svazku se soubor s odstraněním kontejneru ztratí a každá replika má
+vlastní soubor, tedy i vlastní data. Navazuje se na to:
 [case study A](case-study-a-dockerfile/) to ukazuje v příkladech 4 a 5 (restart
 kontejneru, replikace za nginx), [case study B](case-study-b-tooling/05-compose/)
 pak pojmenovaný svazek, který odstranění kontejneru přežije.
@@ -62,6 +62,17 @@ dotnet run --project src/UAI.ZeroVP.API
 API naslouchá na `http://localhost:5258`. Kořen `/` přesměruje na Swagger UI
 (nebo na seznam úkolů, pokud je Swagger vypnutý).
 
+### Více instancí
+
+```bash
+./scripts/run-instances.sh
+```
+
+spustí tři instance `api-5001`, `api-5002` a `api-5003` na portech 5001–5003 nad společným
+souborem s úkoly. Která instance odpověděla, ukazuje `GET /api/info`, hlavička `X-Instance-Id`
+a každý řádek logu. Jméno instance se nastavuje přes `Instance:Name` (`Instance__Name`).
+Podrobnosti v [docs/multiple-instances.md](docs/multiple-instances.md).
+
 ## Endpointy
 
 | Metoda | Cesta | Popis |
@@ -73,13 +84,14 @@ API naslouchá na `http://localhost:5258`. Kořen `/` přesměruje na Swagger UI
 | `PUT` | `/api/todos/{id}` | Úplná aktualizace úkolu |
 | `POST` | `/api/todos/{id}/complete` | Označení úkolu za dokončený |
 | `DELETE` | `/api/todos/{id}` | Smazání úkolu → `204 No Content` |
-| `GET` | `/api/info` | Hostname instance, prostředí, doba běhu, počet úkolů v paměti |
+| `GET` | `/api/info` | Jméno instance, hostname, prostředí, doba běhu, počet úkolů v úložišti |
 | `GET` | `/health` | Kontrola zdraví – použije ji `HEALTHCHECK` v Dockerfile |
 | `GET` | `/swagger` | Interaktivní dokumentace Swagger UI |
 | `GET` | `/openapi/v1.json` | Popis API ve formátu OpenAPI |
 | `GET` | `/openapi/v1.yaml` | Stejný popis API ve formátu YAML |
 
 Chybové odpovědi mají jednotný tvar `ProblemDetails` (RFC 9457).
+Každá odpověď nese hlavičku `X-Instance-Id` se jménem instance, která ji obsloužila.
 Připravené požadavky k odzkoušení jsou v souboru `src/UAI.ZeroVP.API/UAI.ZeroVP.API.http`.
 
 ### Uživatel úkolu

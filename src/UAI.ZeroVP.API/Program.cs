@@ -2,6 +2,7 @@
 using System.Text.Json.Serialization;
 using Microsoft.OpenApi;
 using UAI.ZeroVP.API.OpenApi;
+using UAI.ZeroVP.API.Instance;
 using UAI.ZeroVP.Data.DependencyInjection;
 using UAI.ZeroVP.Data.InMemory;
 using UAI.ZeroVP.Data.JsonFile;
@@ -21,21 +22,30 @@ var logFilePath = Path.IsPathRooted(configuredLogFilePath)
 // Limit doby odezvy API. Pomalejší požadavky se v logu zvýrazní jako Warning.
 var responseTimeBudgetMs = builder.Configuration.GetValue("Performance:ResponseTimeBudgetMs", 500.0);
 
+// Jméno této instance – při běhu několika instancí podle něj poznáme, která co obsloužila.
+var instance = InstanceIdentity.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(instance);
+
 builder.Services.AddSerilog((services, loggerConfiguration) =>
 {
     loggerConfiguration
         .MinimumLevel.Information()
         .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
         .Enrich.FromLogContext()
+        // Jméno instance v každém řádku logu.
+        .Enrich.WithProperty("InstanceName", instance.Name)
         // Zápis do konzole a souboru běží na pozadí – požadavek nečeká na disk ani na terminál.
         .WriteTo.Async(sinks =>
         {
-            sinks.Console();
+            sinks.Console(
+                outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] [{InstanceName}] {Message:lj}{NewLine}{Exception}");
             sinks.File(
                 logFilePath,
                 rollingInterval: RollingInterval.Day,
+                shared: true,
                 outputTemplate:
-                    "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{SourceContext}] {Message:lj}{NewLine}{Exception}");
+                    "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] [{InstanceName}] [{SourceContext}] {Message:lj}{NewLine}{Exception}");
+            
         });
 });
 
@@ -56,8 +66,8 @@ builder.Services.AddSingleton(TimeProvider.System);
 
 // Datová vrstva: paměťové úložiště. Nastavení se čte ze sekce "Todo",
 // v kontejneru ho lze přepsat proměnnou prostředí Todo__SeedSampleData.
-// S vyplněnou cestou Todo:Storage:FilePath se úkoly při startu načtou ze souboru JSON
-// a při zastavení do něj uloží; prázdná cesta = data jen v paměti (např. v testech).
+// S vyplněnou cestou Todo:Storage:FilePath se úkoly čtou a ukládají do souboru JSON při každé
+// operaci, takže ho může sdílet víc instancí API; prázdná cesta = data jen v paměti (např. v testech).
 var configuredTodoFilePath = builder.Configuration[$"{JsonFileTodoOptions.SectionName}:FilePath"];
 
 if (string.IsNullOrWhiteSpace(configuredTodoFilePath))
@@ -91,8 +101,8 @@ builder.Services.AddOpenApi(options =>
         {
             Title = "UAI.ZeroVP – ToDo API",
             Version = "v1",
-            Description = "Ukázkové API pro výuku Dockeru. Úkoly drží API v paměti "
-                        + "a při zastavení je ukládá do souboru JSON, ze kterého je při startu znovu načte."
+            Description = "Ukázkové API pro výuku Dockeru. Úkoly ukládá do souboru JSON, "
+                        + "který může sdílet několik běžících instancí API."
         };
 
         return Task.CompletedTask;
@@ -124,6 +134,19 @@ app.Lifetime.ApplicationStopped.Register(() =>
 var swaggerEnabled = app.Configuration.GetValue("Swagger:Enabled", app.Environment.IsDevelopment());
 
 // --- HTTP pipeline --------------------------------------------------------
+// Každá odpověď nese jméno instance v hlavičce X-Instance-Id. Nastavuje se až těsně před
+// odesláním (OnStarting), protože obsluha výjimek hlavičky odpovědi maže – i chyba 500
+// tak ukáže, která instance selhala.
+app.Use((context, next) =>
+{
+    context.Response.OnStarting(() =>
+    {
+        context.Response.Headers[InstanceIdentity.HeaderName] = instance.Name;
+        return Task.CompletedTask;
+    });
+
+    return next(context);
+});
 
 // Bez přesměrování na HTTPS: v kontejneru se vystavuje pouze HTTP port
 // a TLS řeší až reverzní proxy před ním.
@@ -197,3 +220,4 @@ static void ConfigureJson(JsonSerializerOptions options)
     // a dokument by pak u každého čísla uváděl typ "integer nebo string".
     options.NumberHandling = JsonNumberHandling.Strict;
 }
+

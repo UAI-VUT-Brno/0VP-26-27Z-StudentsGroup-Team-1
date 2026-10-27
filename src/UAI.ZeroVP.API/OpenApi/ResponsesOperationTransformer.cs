@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
+using UAI.ZeroVP.API.Instance;
 
 namespace UAI.ZeroVP.API.OpenApi;
 
@@ -28,6 +29,7 @@ public sealed class ResponsesOperationTransformer : IOpenApiOperationTransformer
             }
 
             RemoveMediaTypesWithoutSchema(concreteResponse);
+            AddInstanceHeader(concreteResponse);
 
             if (statusCode == "201")
             {
@@ -74,6 +76,19 @@ public sealed class ResponsesOperationTransformer : IOpenApiOperationTransformer
             Schema = new OpenApiSchema { Type = JsonSchemaType.String, Format = "uri" }
         };
     }
+
+    /// <summary>Hlavičku se jménem instance přidává middleware v <c>Program.cs</c> ke každé odpovědi.</summary>
+    private static void AddInstanceHeader(OpenApiResponse response)
+    {
+        response.Headers ??= new Dictionary<string, IOpenApiHeader>();
+        response.Headers[InstanceIdentity.HeaderName] = new OpenApiHeader
+        {
+            Description = "Jméno instance API, která požadavek obsloužila.",
+            Required = true,
+            Schema = new OpenApiSchema { Type = JsonSchemaType.String }
+        };
+    }
+
 
     /// <summary>Odpovědi zadané na úrovni kontroleru (500) by jinak byly v dokumentu první.</summary>
     private static void SortByStatusCode(OpenApiResponses responses)
