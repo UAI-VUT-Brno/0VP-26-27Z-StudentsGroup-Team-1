@@ -1,0 +1,19 @@
+<Project>
+
+  <!-- Společné nastavení všech projektů v řešení (MSBuild ho načte automaticky). -->
+
+  <!-- NuGet Audit: při restore porovná balíčky (i tranzitivní) s databází zranitelností GitHubu. -->
+  <PropertyGroup>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+    <!-- Středně závažná a horší zranitelnost build zastaví, nízká zůstane varováním. -->
+    <WarningsAsErrors>$(WarningsAsErrors);NU1902;NU1903;NU1904</WarningsAsErrors>
+  </PropertyGroup>
+
+  <!-- Bezpečnostní pravidla analyzátorů .NET (CA2xxx, CA3xxx, CA5xxx) zapíná jako chyby
+       .editorconfig (dotnet_analyzer_diagnostic.category-Security.severity).
+       AnalysisModeSecurity sem nepatří – nastavuje závažnost po jednotlivých pravidlech
+       a tím by kategorii v .editorconfig přebil zpět na varování. -->
+
+</Project>

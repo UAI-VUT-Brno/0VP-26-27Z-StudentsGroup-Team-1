@@ -1,0 +1,25 @@
+# Dependabot hlídá zastaralé a zranitelné závislosti a sám na ně otevírá pull requesty.
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    # Balíčky Microsoftu a testovací knihovny chodí v jednom PR, ať jich není deset najednou.
+    groups:
+      microsoft:
+        patterns:
+          - 'Microsoft.*'
+          - 'System.*'
+      serilog:
+        patterns:
+          - 'Serilog*'
+      test:
+        patterns:
+          - 'xunit*'
+          - 'coverlet*'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
