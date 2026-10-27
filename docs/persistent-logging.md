@@ -61,6 +61,7 @@ Persistent log entries contain:
 
 - date and time
 - log level
+- instance name (`Instance:Name`, see [multiple-instances.md](multiple-instances.md))
 - event source
 - event description
 - event result where applicable
@@ -76,23 +77,27 @@ Successful `/health` requests are logged at `Verbose` level so that frequent Doc
 
 Application start and stop are logged explicitly as lifecycle events with the result `Success`.
 
+## Several instances
+
+The log file is opened in shared mode (`shared: true`). Several instances – processes on one machine, or container replicas with a shared log volume – can therefore write into the same file at once without locking each other out. The instance name in every line tells them apart. The console output contains the instance name too.
+
 ## Examples
 
 Successful API request:
 
-`2026-10-06 20:51:42.329 +02:00 [INF] [Serilog.AspNetCore.RequestLoggingMiddleware] HTTP GET /api/todos responded 200 in 220.3090 ms`
+`2026-10-06 20:51:42.329 +02:00 [INF] [api-5001] [Serilog.AspNetCore.RequestLoggingMiddleware] HTTP GET /api/todos responded 200 in 220.3090 ms`
 
 Failed API request:
 
-`2026-10-06 20:34:54.749 +02:00 [WRN] [Serilog.AspNetCore.RequestLoggingMiddleware] HTTP GET /api/todos/00000000-0000-0000-0000-000000000000 responded 404 in 45.3989 ms`
+`2026-10-06 20:34:54.749 +02:00 [WRN] [api-5001] [Serilog.AspNetCore.RequestLoggingMiddleware] HTTP GET /api/todos/00000000-0000-0000-0000-000000000000 responded 404 in 45.3989 ms`
 
 Application start:
 
-`2026-10-06 21:06:15.029 +02:00 [INF] [UAI.ZeroVP.API] Application lifecycle event Start completed with result Success.`
+`2026-10-06 21:06:15.029 +02:00 [INF] [api-5001] [UAI.ZeroVP.API] Application lifecycle event Start completed with result Success.`
 
 Application stop:
 
-`2026-10-06 21:06:49.575 +02:00 [INF] [UAI.ZeroVP.API] Application lifecycle event Stop completed with result Success.`
+`2026-10-06 21:06:49.575 +02:00 [INF] [api-5001] [UAI.ZeroVP.API] Application lifecycle event Stop completed with result Success.`
 
 For a server error, the request is logged at `Error` level with HTTP status `500`.
 
