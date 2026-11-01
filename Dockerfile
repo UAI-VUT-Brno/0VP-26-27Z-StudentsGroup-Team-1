@@ -2,6 +2,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 
 WORKDIR /src
 
+COPY Directory.Build.props ./
 COPY src/UAI.ZeroVP.DTO/UAI.ZeroVP.DTO.csproj src/UAI.ZeroVP.DTO/
 COPY src/UAI.ZeroVP.Data/UAI.ZeroVP.Data.csproj src/UAI.ZeroVP.Data/
 COPY src/UAI.ZeroVP.API/UAI.ZeroVP.API.csproj src/UAI.ZeroVP.API/
