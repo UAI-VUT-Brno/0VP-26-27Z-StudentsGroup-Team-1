@@ -79,7 +79,15 @@ Application start and stop are logged explicitly as lifecycle events with the re
 
 ## Several instances
 
-The log file is opened in shared mode (`shared: true`). Several instances – processes on one machine, or container replicas with a shared log volume – can therefore write into the same file at once without locking each other out. The instance name in every line tells them apart. The console output contains the instance name too.
+The file sink uses `shared: true`, which allows multiple processes to open the same log file. However, separate application instances should not be configured to write concurrently to the same physical log file, because concurrent writes can result in lost log entries.
+
+When several Docker API instances share the same log volume, each instance therefore uses its own `PersistentLogging__FilePath`. For example, the Compose configuration writes to:
+
+- `/app/logs/api-1-.log`
+- `/app/logs/api-2-.log`
+- `/app/logs/api-3-.log`
+
+The files are stored in the same Docker named volume, but each API instance writes to a separate file. The configured instance name is also included in every log entry and in console output.
 
 ## Examples
 

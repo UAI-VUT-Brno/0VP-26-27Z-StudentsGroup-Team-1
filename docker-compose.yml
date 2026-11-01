@@ -1,0 +1,52 @@
+x-api-common: &api-common
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: uai-zerovp-api:local
+
+  volumes:
+    - todo-data:/app/data
+    - api-logs:/app/logs
+
+x-api-environment: &api-environment
+  ASPNETCORE_ENVIRONMENT: Production
+  Todo__Storage__FilePath: /app/data/todos.json
+  Todo__SeedSampleData: "false"
+
+services:
+  api-1:
+    <<: *api-common
+
+    ports:
+      - "127.0.0.1:5001:8080"
+
+    environment:
+      <<: *api-environment
+      Instance__Name: api-1
+      PersistentLogging__FilePath: /app/logs/api-1-.log
+
+  api-2:
+    <<: *api-common
+
+    ports:
+      - "127.0.0.1:5002:8080"
+
+    environment:
+      <<: *api-environment
+      Instance__Name: api-2
+      PersistentLogging__FilePath: /app/logs/api-2-.log
+
+  api-3:
+    <<: *api-common
+
+    ports:
+      - "127.0.0.1:5003:8080"
+
+    environment:
+      <<: *api-environment
+      Instance__Name: api-3
+      PersistentLogging__FilePath: /app/logs/api-3-.log
+
+volumes:
+  todo-data:
+  api-logs:
