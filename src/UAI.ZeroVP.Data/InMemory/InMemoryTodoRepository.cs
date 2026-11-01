@@ -52,12 +52,12 @@ public sealed class InMemoryTodoRepository : ITodoRepository
     }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<TodoItem>> GetAllAsync(bool? isCompleted = null, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<TodoItem>> GetAllAsync(string? userId = null, bool? isCompleted = null, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         IReadOnlyList<TodoItem> result = _items.Values
-            .Where(item => isCompleted is null || item.IsCompleted == isCompleted)
+            .Where(item => (userId is null || string.Equals(item.UserId, userId, StringComparison.Ordinal)) && (isCompleted is null || item.IsCompleted == isCompleted))
             .OrderByDescending(item => item.Priority)
             .ThenBy(item => item.CreatedAtUtc)
             .Select(item => item.Clone())

@@ -35,7 +35,7 @@ curl http://localhost:5258/openapi/v1.yaml -o openapi.yaml
 
 | Method | Path | Input | Responses |
 |---|---|---|---|
-| `GET` | `/api/todos` | query `isCompleted` (boolean, optional) | `200` list of `TodoItemDto`, `400`, `500` |
+| `GET` | `/api/todos` | query `userId` (string, optional), `isCompleted` (boolean, optional); filters can be combined | `200` list of `TodoItemDto`, `400`, `500` |
 | `POST` | `/api/todos` | body `CreateTodoItemRequest` | `201` `TodoItemDto` + `Location` header, `400`, `415`, `500` |
 | `POST` | `/api/todos/repeat` | body `CreateRepeatingTodoItemRequest` | `201` list of `TodoItemDto` + `Location` header of the first occurrence, `400`, `415`, `500` |
 | `GET` | `/api/todos/{id}` | path `id` (uuid) | `200` `TodoItemDto`, `404`, `500` |

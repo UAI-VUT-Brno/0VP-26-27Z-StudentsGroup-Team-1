@@ -52,8 +52,8 @@ public sealed class JsonFileTodoRepository : ITodoRepository
     }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<TodoItem>> GetAllAsync(bool? isCompleted = null, CancellationToken cancellationToken = default) =>
-        ExecuteAsync(repository => repository.GetAllAsync(isCompleted, cancellationToken), isWrite: false, cancellationToken);
+    public Task<IReadOnlyList<TodoItem>> GetAllAsync(string? userId = null, bool? isCompleted = null, CancellationToken cancellationToken = default) =>
+    ExecuteAsync(repository => repository.GetAllAsync(userId, isCompleted, cancellationToken), isWrite: false, cancellationToken);
 
     /// <inheritdoc />
     public Task<TodoItem?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
