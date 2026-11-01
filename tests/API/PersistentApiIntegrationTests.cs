@@ -108,6 +108,50 @@ public sealed class PersistentApiIntegrationTests : IDisposable
         Assert.Equal("Shared task", todo.GetProperty("title").GetString());
     }
 
+    [Fact]
+    public async Task PersistentStore_UserFilter_WorksWithCompletionFilter()
+    {
+        await using var factory = CreateFactory("api-filter");
+        using var client = factory.CreateClient();
+
+        var aliceCompletedId = await CreateTodoAsync(
+            client,
+            userId: "alice",
+            title: "Alice completed");
+
+        var aliceOpenId = await CreateTodoAsync(
+            client,
+            userId: "alice",
+            title: "Alice open");
+
+        await CreateTodoAsync(
+            client,
+            userId: "bob",
+            title: "Bob open");
+
+        using var completedResponse = await client.PostAsync(
+            $"/api/todos/{aliceCompletedId}/complete",
+            null);
+
+        completedResponse.EnsureSuccessStatusCode();
+
+        var aliceIds = await GetTodoIdsAsync(
+            client,
+            "/api/todos?userId=alice");
+
+        Assert.Equal(
+            new[] { aliceCompletedId, aliceOpenId }.Order(),
+            aliceIds.Order());
+
+        var aliceOpenIds = await GetTodoIdsAsync(
+            client,
+            "/api/todos?userId=alice&isCompleted=false");
+
+        Assert.Equal(
+            new[] { aliceOpenId },
+            aliceOpenIds);
+    }
+
     private PersistentApiTestFactory CreateFactory(string instanceName) =>
         new(StorageFilePath, instanceName);
 
@@ -130,5 +174,22 @@ public sealed class PersistentApiIntegrationTests : IDisposable
             await response.Content.ReadAsStringAsync());
 
         return document.RootElement.GetProperty("id").GetGuid();
+    }
+
+    private static async Task<Guid[]> GetTodoIdsAsync(
+        HttpClient client,
+        string url)
+    {
+        using var response = await client.GetAsync(url);
+
+        response.EnsureSuccessStatusCode();
+
+        using var document = JsonDocument.Parse(
+            await response.Content.ReadAsStringAsync());
+
+        return document.RootElement
+            .EnumerateArray()
+            .Select(item => item.GetProperty("id").GetGuid())
+            .ToArray();
     }
 }
