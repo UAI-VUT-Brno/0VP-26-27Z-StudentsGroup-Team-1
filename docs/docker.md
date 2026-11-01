@@ -1,12 +1,16 @@
 # Docker
 
-The API can run in Docker as multiple replicas sharing one persistent JSON storage volume.
+The API can run in Docker as three named API instances sharing one persistent JSON storage volume.
 
-The default Compose configuration starts three API replicas. Each replica listens on port `8080` inside its container and is exposed locally through one of the host ports `5001`–`5003`.
+The default Compose configuration starts the services `api-1`, `api-2`, and `api-3`. Each service listens on port `8080` inside its container and has a fixed host port:
+
+- `api-1` → `http://localhost:5001`
+- `api-2` → `http://localhost:5002`
+- `api-3` → `http://localhost:5003`
 
 ## Build and start
 
-Build the API image and start all configured replicas:
+Build the API image and start all configured services:
 
 ```powershell
 docker compose up --build -d
@@ -18,21 +22,17 @@ Check the running containers:
 docker compose ps
 ```
 
-All API containers should eventually report a `healthy` status.
+All three API containers should eventually report a `healthy` status.
 
-The replicas are available locally at:
+## Instance identity
 
-- `http://localhost:5001`
-- `http://localhost:5002`
-- `http://localhost:5003`
+Each API service has an explicit instance name:
 
-The ports are assigned from the configured range, so a particular replica number is not guaranteed to always receive the same host port.
+- `api-1`
+- `api-2`
+- `api-3`
 
-## Replica identity
-
-Each container has its own instance identity.
-
-To check which replica answered a request:
+To check which instance answered a request:
 
 ```powershell
 Invoke-RestMethod http://localhost:5001/api/info
@@ -40,11 +40,11 @@ Invoke-RestMethod http://localhost:5002/api/info
 Invoke-RestMethod http://localhost:5003/api/info
 ```
 
-The `instanceName` and `machineName` values should differ between replicas.
+The `instanceName` values should be `api-1`, `api-2`, and `api-3` respectively. Each container also has its own `machineName`.
 
 ## Shared task storage
 
-All API replicas use the same Docker named volume mounted at:
+All three API services use the same Docker named volume mounted at:
 
 ```text
 /app/data
@@ -56,7 +56,7 @@ The JSON task file is configured through:
 Todo__Storage__FilePath=/app/data/todos.json
 ```
 
-This means a task created through one replica is visible through the other replicas.
+This means a task created through one API instance is visible through the others.
 
 For example, a task can be created through port `5001` and then retrieved through port `5003`.
 
@@ -72,33 +72,47 @@ Therefore, a newly created or reset data volume starts with an empty task store.
 
 ## Logs
 
-Persistent application logs are written to:
+Persistent application logs are stored in the Docker named volume `api-logs`, mounted at:
 
 ```text
 /app/logs
 ```
 
-and stored in the Docker named volume `api-logs`.
-
-The log path is configured through:
+Each API service writes to its own log file:
 
 ```text
-PersistentLogging__FilePath=/app/logs/uai-zerovp-.log
+api-1 → /app/logs/api-1-.log
+api-2 → /app/logs/api-2-.log
+api-3 → /app/logs/api-3-.log
 ```
 
-## Scaling
+The files use daily rolling, so the actual filenames include the date, for example:
 
-The Compose configuration uses three replicas by default.
+```text
+api-1-20261101.log
+api-2-20261101.log
+api-3-20261101.log
+```
 
-To explicitly run three replicas:
+Using a separate file per service avoids multiple container processes writing concurrently to the same physical log file.
+
+The logs are stored in a Docker named volume, so they are not normally visible as files in the repository working directory.
+
+To inspect the log directory from a running service:
 
 ```powershell
-docker compose up -d --scale api=3
+docker compose exec api-1 sh -c "ls -la /app/logs"
 ```
 
-The current published host-port range is `5001`–`5003`, so it supports up to three simultaneously exposed replicas.
+## Number of instances
 
-If more replicas are required, extend the published port range in `docker-compose.yml` accordingly.
+The Compose configuration explicitly defines three named API services: `api-1`, `api-2`, and `api-3`.
+
+The setup does not use `docker compose --scale` because each service has its own fixed host port, instance name, and log file path.
+
+If the number of instances needs to change, add or remove named services in `docker-compose.yml` and configure a unique host port, `Instance__Name`, and `PersistentLogging__FilePath` for each instance.
+
+All instances should continue to use the same `todo-data` volume so they share the same task storage.
 
 ## Stop
 
