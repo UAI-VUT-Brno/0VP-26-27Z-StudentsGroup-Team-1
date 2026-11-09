@@ -98,3 +98,29 @@ Po spuštění `gemini` příkaz `/mcp` ukázal `todo-api` jako Ready se dvěma 
 ![Gemini CLI vidí oba nástroje](img/mcp-gemini-cli-test.png)
 
 Dotazy se nepodařilo dokončit: přihlášení osobním účtem Google už Gemini CLI nepodporuje a Gemini API vrátilo s API klíčem chybu 403 (`PERMISSION_DENIED`) i na jednoduchý dotaz bez nástrojů. Příčina není v MCP serveru.
+
+### Ukázkové dotazy a pozorování
+
+Testováno v GitHub Copilot Chat (režim Agent).
+
+| Dotaz | Zavolaný nástroj | Výsledek |
+|---|---|---|
+| „Which of my tasks are not done yet? My user ID is alice.“ | `list_todos` s `userId=alice` a `isCompleted=false` | Správně: 4 nedokončené úkoly. |
+| „Show details of task 901ed95f-e20b-45d5-847a-9cde9a986674.“ | `get_todo` | Správně: úkol „Write documentation“. |
+| „How many tasks are completed?“ | `list_todos` s `isCompleted=true` | Odpověděl 1, protože použil i `userId=alice` z předchozí otázky. |
+| „How many tasks are completed in total, across all users?“ | `list_todos` s `isCompleted=true` | Správně: 2. |
+| Žádost o vytvoření nebo smazání úkolu | žádný | Asistent úkol nevytvořil ani nesmazal, protože neexistuje nástroj pro zápis. |
+
+![Test v GitHub Copilot Chat](img/mcp-github-copilot-test.png)
+
+**Co fungovalo:** asistent vybíral správný nástroj a správné argumenty a server je jen pro čtení.
+
+**Pozorování:**
+
+- Inspector u obou parametrů `list_todos` varuje, že typ je zapsaný jako pole (`["boolean","null"]`, `["string","null"]`). Je to platné JSON Schema, ale někteří klienti (například Gemini) ho mohou odmítnout nebo parametr ignorovat.
+- Dotaz bez uvedení uživatele asistent filtroval podle ID z předchozí otázky. Popisy nástrojů to neovlivňují.
+
+
+- Gemini CLI zaregistrovalo oba nástroje i přes varování Inspectoru o typu `["boolean","null"]`. Zda by Gemini parametry po úspěšném přihlášení správně použilo, jsme neověřili.
+
+> **Pozor:** MCP endpoint nemá autentizaci a je určený pouze pro lokální vývoj. Nevystavujte ho veřejně.
