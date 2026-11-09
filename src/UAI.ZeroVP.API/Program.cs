@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Microsoft.OpenApi;
 using UAI.ZeroVP.API.OpenApi;
 using UAI.ZeroVP.API.Instance;
+using UAI.ZeroVP.API.Mcp;
 using UAI.ZeroVP.Data.DependencyInjection;
 using UAI.ZeroVP.Data.InMemory;
 using UAI.ZeroVP.Data.JsonFile;
@@ -57,6 +58,14 @@ builder.Services.AddControllers()
 // Generátor OpenAPI nečte nastavení kontrolerů výše, ale nastavení minimal API.
 // Bez tohoto řádku by dokument popisoval výčty jako čísla, i když je API posílá jako řetězce.
 builder.Services.ConfigureHttpJsonOptions(options => ConfigureJson(options.SerializerOptions));
+
+var mcpEnabled = builder.Configuration.GetValue("Mcp:Enabled", builder.Environment.IsDevelopment());
+if (mcpEnabled)
+{
+    builder.Services.AddMcpServer()
+        .WithHttpTransport()
+        .WithTools<TodoTools>();
+}
 
 // Jednotné chybové odpovědi ve formátu ProblemDetails (RFC 9457).
 builder.Services.AddProblemDetails();
@@ -202,6 +211,11 @@ if (swaggerEnabled)
 
 app.MapHealthChecks("/health");
 app.MapControllers();
+
+if (mcpEnabled)
+{
+    app.MapMcp("/mcp").ExcludeFromDescription();
+}
 
 // Kořen vede na Swagger, ať má "docker run" hned co ukázat.
 // Když je Swagger vypnutý, přesměruje rovnou na seznam úkolů.
