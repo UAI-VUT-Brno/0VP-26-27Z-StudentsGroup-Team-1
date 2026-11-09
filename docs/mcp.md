@@ -85,14 +85,6 @@ Přidejte server do souboru `~/.gemini/settings.json`:
 { "mcpServers": { "todo-api": { "httpUrl": "http://localhost:5258/mcp" } } }
 ```
 
-### Gemini CLI
-
-Přidejte server do souboru `~/.gemini/settings.json`:
-
-```json
-{ "mcpServers": { "todo-api": { "httpUrl": "http://localhost:5258/mcp" } } }
-```
-
 Po spuštění `gemini` příkaz `/mcp` ukázal `todo-api` jako Ready se dvěma nástroji (`get_todo`, `list_todos`).
 
 ![Gemini CLI vidí oba nástroje](img/mcp-gemini-cli-test.png)
@@ -119,7 +111,6 @@ Testováno v GitHub Copilot Chat (režim Agent).
 
 - Inspector u obou parametrů `list_todos` varuje, že typ je zapsaný jako pole (`["boolean","null"]`, `["string","null"]`). Je to platné JSON Schema, ale někteří klienti (například Gemini) ho mohou odmítnout nebo parametr ignorovat.
 - Dotaz bez uvedení uživatele asistent filtroval podle ID z předchozí otázky. Popisy nástrojů to neovlivňují.
-
 
 - Gemini CLI zaregistrovalo oba nástroje i přes varování Inspectoru o typu `["boolean","null"]`. Zda by Gemini parametry po úspěšném přihlášení správně použilo, jsme neověřili.
 
