@@ -119,6 +119,8 @@ se ostatních nedotkne. Každý úkol má v odpovědi pole `dueAtUtc`; úkoly za
 `POST /api/todos` termín nemají (`null`).
 
 
+Pro čtení úkolů v lokálním vývoji je k dispozici také [MCP](docs/mcp.md).
+
 ## Swagger
 
 Dokument OpenAPI 3.1 generuje vestavěná knihovna .NET 10 (`Microsoft.AspNetCore.OpenApi`)
