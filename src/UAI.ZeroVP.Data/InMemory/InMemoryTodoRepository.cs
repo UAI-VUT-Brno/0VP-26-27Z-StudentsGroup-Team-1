@@ -57,7 +57,7 @@ public sealed class InMemoryTodoRepository : ITodoRepository
         cancellationToken.ThrowIfCancellationRequested();
 
         IReadOnlyList<TodoItem> result = _items.Values
-            .Where(item => (userId is null || string.Equals(item.UserId, userId, StringComparison.Ordinal)) && (isCompleted is null || item.IsCompleted == isCompleted))
+            .Where(item => Matches(item, userId, isCompleted))
             .OrderByDescending(item => item.Priority)
             .ThenBy(item => item.CreatedAtUtc)
             .Select(item => item.Clone())
@@ -159,12 +159,28 @@ public sealed class InMemoryTodoRepository : ITodoRepository
     }
 
     /// <inheritdoc />
-    public Task<int> CountAsync(CancellationToken cancellationToken = default)
+    public Task<int> CountAsync(string? userId = null, bool? isCompleted = null, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        return Task.FromResult(_items.Count);
+        // Bez filtrů stačí velikost slovníku; s filtry se jen počítá, nic se nekopíruje.
+        var count = userId is null && isCompleted is null
+            ? _items.Count
+            : _items.Values.Count(item => Matches(item, userId, isCompleted));
+
+        return Task.FromResult(count);
     }
+
+    /// <summary>
+    /// Společný filtr pro <see cref="GetAllAsync"/> a <see cref="CountAsync"/>,
+    /// aby počet vždy odpovídal délce seznamu se stejnými filtry.
+    /// </summary>
+    /// <param name="item">Posuzovaný úkol.</param>
+    /// <param name="userId">Filtr podle uživatele (ordinální, citlivý na velikost písmen); <c>null</c> = bez filtru.</param>
+    /// <param name="isCompleted">Filtr na dokončenost; <c>null</c> = bez filtru.</param>
+    private static bool Matches(TodoItem item, string? userId, bool? isCompleted) =>
+        (userId is null || string.Equals(item.UserId, userId, StringComparison.Ordinal))
+        && (isCompleted is null || item.IsCompleted == isCompleted);
 
     /// <summary>Uživatel, kterému patří ukázkové úkoly.</summary>
     public const string SampleUserId = "demo";

@@ -88,8 +88,8 @@ public sealed class JsonFileTodoRepository : ITodoRepository
         ExecuteAsync(repository => repository.DeleteAsync(id, cancellationToken), isWrite: true, cancellationToken);
 
     /// <inheritdoc />
-    public Task<int> CountAsync(CancellationToken cancellationToken = default) =>
-        ExecuteAsync(repository => repository.CountAsync(cancellationToken), isWrite: false, cancellationToken);
+    public Task<int> CountAsync(string? userId = null, bool? isCompleted = null, CancellationToken cancellationToken = default) =>
+        ExecuteAsync(repository => repository.CountAsync(userId, isCompleted, cancellationToken), isWrite: false, cancellationToken);
 
     /// <summary>
     /// Zamkne soubor, načte z něj úkoly, provede nad nimi operaci a po zápisu soubor uloží.

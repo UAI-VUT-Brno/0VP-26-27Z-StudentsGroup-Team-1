@@ -33,6 +33,12 @@ public interface ITodoRepository
     /// <summary>Smaže úkol. Vrací <c>false</c>, pokud záznam neexistuje.</summary>
     Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default);
 
-    /// <summary>Počet úkolů v úložišti – využívá ho diagnostický endpoint.</summary>
-    Task<int> CountAsync(CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Počet úkolů v úložišti, volitelně filtrovaný stejně jako <see cref="GetAllAsync"/>.
+    /// Využívá ho diagnostický endpoint <c>/api/info</c> (bez filtrů) a endpoint <c>/api/todos/count</c>.
+    /// </summary>
+    /// <param name="userId">Filtr podle uživatele; <c>null</c> = bez filtru.</param>
+    /// <param name="isCompleted">Filtr na dokončenost; <c>null</c> = bez filtru.</param>
+    /// <param name="cancellationToken">Token pro zrušení operace.</param>
+    Task<int> CountAsync(string? userId = null, bool? isCompleted = null, CancellationToken cancellationToken = default);
 }
