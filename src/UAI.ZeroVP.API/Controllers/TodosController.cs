@@ -52,6 +52,29 @@ public sealed class TodosController : ControllerBase
         return Ok(items.Select(item => item.ToDto()).ToList());
     }
 
+    /// <summary>Vrátí počet úkolů, volitelně filtrovaný podle uživatele a stavu dokončení.</summary>
+    /// <remarks>Filtry fungují stejně jako u seznamu úkolů; počet odpovídá délce seznamu se stejnými parametry.</remarks>
+    /// <param name="userId">Identifikátor uživatele; vynechání znamená bez filtru.</param>
+    /// <param name="isCompleted">Filtr <c>true</c>/<c>false</c>; vynechání znamená bez filtru.</param>
+    /// <param name="cancellationToken">Token pro zrušení operace.</param>
+    /// <response code="200">Počet úkolů odpovídajících filtrům.</response>
+    /// <response code="400">Parametr <c>isCompleted</c> nemá hodnotu <c>true</c> ani <c>false</c>.</response>
+    [HttpGet("count")]
+    [ProducesResponseType(typeof(TodoCountDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<TodoCountDto>> Count(
+        [FromQuery] string? userId,
+        [FromQuery] bool? isCompleted,
+        CancellationToken cancellationToken)
+    {
+        var count = await _repository.CountAsync(
+            userId: userId,
+            isCompleted: isCompleted,
+            cancellationToken: cancellationToken);
+
+        return Ok(new TodoCountDto { Count = count });
+    }
+
     /// <summary>Vrátí jeden úkol podle identifikátoru.</summary>
     /// <param name="id">Identifikátor úkolu.</param>
     /// <param name="cancellationToken">Token pro zrušení operace.</param>

@@ -30,6 +30,18 @@ Accept: application/json
 GET {{UAI.ZeroVP.API_HostAddress}}/api/todos?userId=jan.novak&isCompleted=false
 Accept: application/json
 
+### Počet všech úkolů
+GET {{UAI.ZeroVP.API_HostAddress}}/api/todos/count
+Accept: application/json
+
+### Počet nedokončených úkolů
+GET {{UAI.ZeroVP.API_HostAddress}}/api/todos/count?isCompleted=false
+Accept: application/json
+
+### Počet nedokončených úkolů jednoho uživatele
+GET {{UAI.ZeroVP.API_HostAddress}}/api/todos/count?userId=jan.novak&isCompleted=false
+Accept: application/json
+
 ### Nový úkol
 POST {{UAI.ZeroVP.API_HostAddress}}/api/todos
 Content-Type: application/json

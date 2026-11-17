@@ -59,7 +59,7 @@ public sealed class InfoController : ControllerBase
             Version = version,
             UtcNow = _timeProvider.GetUtcNow(),
             Uptime = _timeProvider.GetUtcNow() - process.StartTime.ToUniversalTime(),
-            TodoCount = await _repository.CountAsync(cancellationToken)
+            TodoCount = await _repository.CountAsync(cancellationToken: cancellationToken)
         });
     }
 }
