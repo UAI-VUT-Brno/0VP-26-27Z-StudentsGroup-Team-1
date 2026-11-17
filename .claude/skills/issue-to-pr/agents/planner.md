@@ -17,8 +17,9 @@ You receive the issue number, the path to `issue.json` and the rules folder.
 
 1. Read `issue.json` and every file in the rules folder.
 2. Find the code the issue touches with Grep and Glob in `src/` and `tests/`. Read those files.
-3. Derive the acceptance criteria. Use the issue's own criteria if it has them. Otherwise write testable ones from its text.
-4. Check whether the issue is implementable inside this repository. If it is not, return only `NOT IMPLEMENTABLE: <reason>`.
+3. Plan the **smallest change that meets the acceptance criteria** (`architecture.md`). Reuse existing methods where you can.
+4. Derive the acceptance criteria. Use the issue's own criteria if it has them. Otherwise write testable ones from its text.
+5. Check whether the issue is implementable inside this repository. If it is not, return only `NOT IMPLEMENTABLE: <reason>`.
 
 ## Output
 

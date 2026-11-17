@@ -48,7 +48,7 @@ You receive the issue number, the issue title, the branch, the base branch, the 
 
    Take the verification values from the `## Verification` section of `run.md`.
 5. **Create the PR.**
-   - Title: `<type>: <issue title without the 0VP-T1-NN prefix>`.
+   - Title: follow `repository.md`, i.e. `[0VP-T1-NN] <title without the prefix>` when the issue title has that prefix, otherwise `<type>: <issue title>`.
    - Run `gh pr create --base <base> --head <branch> --title "<title>" --body-file .issue-to-pr/<n>/pr-body.md`.
    - Add `--draft` when verification failed.
 
