@@ -9,7 +9,7 @@ can be tried out.
 - The API describes itself in an **OpenAPI 3.1.1** document, generated from the code at runtime.
   There is no hand-written copy that could drift from the implementation.
 - The document is served as JSON and YAML. Swagger UI on top of it lets you send requests from the browser.
-- All 9 endpoints are documented, including `/health` and every error response the API can return
+- All 10 endpoints are documented, including `/health` and every error response the API can return
   (`400`, `404`, `415`, `500`, `503`).
 - Automated tests check that the document is valid OpenAPI and that it matches what the API really returns.
 
@@ -36,6 +36,7 @@ curl http://localhost:5258/openapi/v1.yaml -o openapi.yaml
 | Method | Path | Input | Responses |
 |---|---|---|---|
 | `GET` | `/api/todos` | query `userId` (string, optional), `isCompleted` (boolean, optional); filters can be combined | `200` list of `TodoItemDto`, `400`, `500` |
+| `GET` | `/api/todos/count` | query `userId` (string, optional), `isCompleted` (boolean, optional); same filters as `GET /api/todos` | `200` `TodoCountDto` (`{ "count": integer }`), `400`, `500` |
 | `POST` | `/api/todos` | body `CreateTodoItemRequest` | `201` `TodoItemDto` + `Location` header, `400`, `415`, `500` |
 | `POST` | `/api/todos/repeat` | body `CreateRepeatingTodoItemRequest` | `201` list of `TodoItemDto` + `Location` header of the first occurrence, `400`, `415`, `500` |
 | `GET` | `/api/todos/{id}` | path `id` (uuid) | `200` `TodoItemDto`, `404`, `500` |
@@ -111,6 +112,7 @@ and reads the document with the `Microsoft.OpenApi` library, the same way client
 | `Operation_DocumentsAllResponses` | Each operation has a summary and exactly the expected status codes, each with a description |
 | `Priority_IsDocumentedAsTheStringsTheApiSends`, `Numbers_AreDocumentedAsIntegersOnly` | Data types match the JSON the API sends |
 | `DateWithCustomConverter_IsDocumentedAsDateTimeString` | `firstDueAtUtc` is documented as a `date-time` string despite its custom converter |
+| `Count_DocumentsFilterQueryParametersAndIntegerCount` | `GET /api/todos/count` documents the optional `userId` and `isCompleted` query parameters and an integer `count` |
 | `CreatedResponse_DocumentsLocationHeader`, `EveryResponse_DocumentsInstanceHeader`, `NoContentResponse_HasNoBody`, `ErrorResponses_UseProblemDetails` | Response headers, bodies and error schemas |
 | `RequestBody_IsDescribedByTheRequestParameter` | Guards the `<param>` order described above |
 | `Response_MatchesDocument`, `SuccessfulTodoLifecycle_MatchesDocument` | Real requests (success, `400`, `404`, `415`) return a status code, content type and required headers listed in the document |
