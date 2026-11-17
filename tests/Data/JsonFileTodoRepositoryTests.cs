@@ -97,6 +97,36 @@ public sealed class JsonFileTodoRepositoryTests : IDisposable
         Assert.Equal(2 * tasksPerInstance, await CreateRepository().CountAsync());
     }
 
+    [Fact]
+    public async Task CountAsync_WithFilters_CountsItemsFromFile()
+    {
+        static TodoItem CreateUserItem(string userId, string title, bool isCompleted) => new()
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Title = title,
+            IsCompleted = isCompleted,
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        };
+
+        var writer = CreateRepository();
+        await writer.AddRangeAsync(
+        [
+            CreateUserItem("alice", "Alice hotovo", isCompleted: true),
+            CreateUserItem("alice", "Alice rozdělané", isCompleted: false),
+            CreateUserItem("bob", "Bob rozdělané", isCompleted: false)
+        ]);
+
+        // Druhá instance čte jen ze souboru – filtry musí dojít až do vnitřního úložiště.
+        var reader = CreateRepository();
+
+        Assert.Equal(3, await reader.CountAsync());
+        Assert.Equal(2, await reader.CountAsync(userId: "alice"));
+        Assert.Equal(2, await reader.CountAsync(isCompleted: false));
+        Assert.Equal(1, await reader.CountAsync(userId: "alice", isCompleted: false));
+        Assert.Equal(0, await reader.CountAsync(userId: "nobody"));
+    }
+
     // --- Chybějící soubor ---------------------------------------------------
 
     [Fact]

@@ -115,6 +115,57 @@ public sealed class TodosControllerTests
         Assert.Equal("alice", item.UserId);
         Assert.False(item.IsCompleted);
     }
+
+    // --- GET /api/todos/count -----------------------------------------------
+
+    [Fact]
+    public async Task Count_NoFilters_ReturnsOkWithTotal()
+    {
+        await AddItemAsync("Hotový", isCompleted: true);
+        await AddItemAsync("Rozdělaný", isCompleted: false);
+
+        var dto = AssertOk(await CreateController().Count(userId: null, isCompleted: null, cancellationToken: CancellationToken.None));
+
+        Assert.Equal(2, dto.Count);
+    }
+
+    [Fact]
+    public async Task Count_EmptyRepository_ReturnsZero()
+    {
+        var dto = AssertOk(await CreateController().Count(userId: null, isCompleted: null, cancellationToken: CancellationToken.None));
+
+        Assert.Equal(0, dto.Count);
+    }
+
+    [Theory]
+    [InlineData(true, 1)]
+    [InlineData(false, 2)]
+    public async Task Count_CompletionFilter_IsPassedToRepository(bool isCompleted, int expected)
+    {
+        await AddItemAsync("Hotový", isCompleted: true);
+        await AddItemAsync("Rozdělaný", isCompleted: false);
+        await AddItemAsync("Další rozdělaný", isCompleted: false);
+
+        var dto = AssertOk(await CreateController().Count(userId: null, isCompleted: isCompleted, cancellationToken: CancellationToken.None));
+
+        Assert.Equal(expected, dto.Count);
+    }
+
+    [Fact]
+    public async Task Count_UserAndCompletionFilters_ArePassedToRepository()
+    {
+        await AddItemAsync("Alice hotovo", isCompleted: true, userId: "alice");
+        await AddItemAsync("Alice rozdělané", isCompleted: false, userId: "alice");
+        await AddItemAsync("Bob rozdělané", isCompleted: false, userId: "bob");
+
+        var dto = AssertOk(await CreateController().Count(
+            userId: "alice",
+            isCompleted: false,
+            cancellationToken: CancellationToken.None));
+
+        Assert.Equal(1, dto.Count);
+    }
+
     // --- GET /api/todos/{id} ------------------------------------------------
 
     [Fact]
@@ -432,7 +483,7 @@ public sealed class TodosControllerTests
         public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default) =>
             inner.DeleteAsync(id, cancellationToken);
 
-        public Task<int> CountAsync(CancellationToken cancellationToken = default) =>
-            inner.CountAsync(cancellationToken);
+        public Task<int> CountAsync(string? userId = null, bool? isCompleted = null, CancellationToken cancellationToken = default) =>
+            inner.CountAsync(userId, isCompleted, cancellationToken);
     }
 }

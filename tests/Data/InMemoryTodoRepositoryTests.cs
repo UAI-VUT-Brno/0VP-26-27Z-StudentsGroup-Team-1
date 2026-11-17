@@ -527,6 +527,78 @@ public async Task GetAllAsync_UserFilter_IsCaseSensitive()
         Assert.Equal(1, await repository.CountAsync());
     }
 
+    // --- Počet s filtry -----------------------------------------------------
+
+    /// <summary>Úložiště se třemi úkoly: hotový a rozdělaný úkol uživatele alice, rozdělaný úkol uživatele bob.</summary>
+    private static async Task<InMemoryTodoRepository> CreateRepositoryForCountAsync()
+    {
+        var repository = CreateEmptyRepository();
+        await repository.AddAsync(CreateItem("Alice hotovo", isCompleted: true, userId: "alice"));
+        await repository.AddAsync(CreateItem("Alice rozdělané", isCompleted: false, userId: "alice"));
+        await repository.AddAsync(CreateItem("Bob rozdělané", isCompleted: false, userId: "bob"));
+
+        return repository;
+    }
+
+    [Fact]
+    public async Task CountAsync_NoFilters_ReturnsTotal()
+    {
+        var repository = await CreateRepositoryForCountAsync();
+
+        Assert.Equal(3, await repository.CountAsync());
+        Assert.Equal(3, await repository.CountAsync(userId: null, isCompleted: null));
+    }
+
+    [Theory]
+    [InlineData(true, 1)]
+    [InlineData(false, 2)]
+    public async Task CountAsync_CompletionFilter_CountsMatchingItems(bool isCompleted, int expected)
+    {
+        var repository = await CreateRepositoryForCountAsync();
+
+        Assert.Equal(expected, await repository.CountAsync(isCompleted: isCompleted));
+    }
+
+    [Fact]
+    public async Task CountAsync_UserFilter_IsCaseSensitive()
+    {
+        var repository = await CreateRepositoryForCountAsync();
+
+        Assert.Equal(2, await repository.CountAsync(userId: "alice"));
+        Assert.Equal(0, await repository.CountAsync(userId: "Alice"));
+        Assert.Equal(0, await repository.CountAsync(userId: "nobody"));
+    }
+
+    [Fact]
+    public async Task CountAsync_UserAndCompletionFilters_Combine()
+    {
+        var repository = await CreateRepositoryForCountAsync();
+
+        Assert.Equal(1, await repository.CountAsync(userId: "alice", isCompleted: false));
+        Assert.Equal(1, await repository.CountAsync(userId: "alice", isCompleted: true));
+        Assert.Equal(0, await repository.CountAsync(userId: "bob", isCompleted: true));
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData(null, true)]
+    [InlineData(null, false)]
+    [InlineData("alice", null)]
+    [InlineData("alice", true)]
+    [InlineData("alice", false)]
+    [InlineData("nobody", null)]
+    [InlineData("nobody", true)]
+    [InlineData("nobody", false)]
+    public async Task CountAsync_MatchesGetAllAsyncForEveryFilterCombination(string? userId, bool? isCompleted)
+    {
+        // Počet a seznam sdílejí jeden filtr – pro stejné parametry se nesmí rozejít.
+        var repository = await CreateRepositoryForCountAsync();
+
+        var count = await repository.CountAsync(userId, isCompleted);
+
+        Assert.Equal((await repository.GetAllAsync(userId, isCompleted)).Count, count);
+    }
+
     // --- Zrušení operace ----------------------------------------------------
 
     public static TheoryData<string, Func<InMemoryTodoRepository, CancellationToken, Task>> AllOperations => new()
@@ -537,7 +609,7 @@ public async Task GetAllAsync_UserFilter_IsCaseSensitive()
         { "AddRange", (repository, token) => repository.AddRangeAsync([CreateItem()], token) },
         { "Update", (repository, token) => repository.UpdateAsync(CreateItem(), token) },
         { "Delete", (repository, token) => repository.DeleteAsync(Guid.NewGuid(), token) },
-        { "Count", (repository, token) => repository.CountAsync(token) }
+        { "Count", (repository, token) => repository.CountAsync(cancellationToken: token) }
     };
 
     [Theory]

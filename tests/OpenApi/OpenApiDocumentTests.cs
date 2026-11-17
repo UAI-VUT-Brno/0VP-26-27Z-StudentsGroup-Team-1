@@ -64,6 +64,7 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
 
     [Theory]
     [InlineData("GET", "/api/todos", "200 400 500")]
+    [InlineData("GET", "/api/todos/count", "200 400 500")]
     [InlineData("POST", "/api/todos", "201 400 415 500")]
     [InlineData("POST", "/api/todos/repeat", "201 400 415 500")]
     [InlineData("GET", "/api/todos/{id}", "200 404 500")]
@@ -123,6 +124,24 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
         Assert.Equal(ParameterLocation.Query, userId.In);
         Assert.False(userId.Required);
     }
+
+    [Fact]
+    public async Task Count_DocumentsFilterQueryParametersAndIntegerCount()
+    {
+        var document = await LoadDocumentAsync();
+        var operation = GetOperation(document, "GET", "/api/todos/count");
+
+        foreach (var name in new[] { "userId", "isCompleted" })
+        {
+            var parameter = Assert.Single(operation.Parameters!, parameter => parameter.Name == name);
+            Assert.Equal(ParameterLocation.Query, parameter.In);
+            Assert.False(parameter.Required);
+        }
+
+        var schema = document.Components!.Schemas!["TodoCountDto"];
+        Assert.Equal(JsonSchemaType.Integer, schema.Properties!["count"].Type);
+    }
+
     // --- Typy a struktura ----------------------------------------------------
 
     [Fact]
@@ -222,6 +241,8 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
     [Theory]
     [InlineData("GET", "/api/todos", "/api/todos", null, null, 200)]
     [InlineData("GET", "/api/todos?isCompleted=abc", "/api/todos", null, null, 400)]
+    [InlineData("GET", "/api/todos/count", "/api/todos/count", null, null, 200)]
+    [InlineData("GET", "/api/todos/count?isCompleted=abc", "/api/todos/count", null, null, 400)]
     [InlineData("POST", "/api/todos", "/api/todos", "{\"title\":\"\"}", "application/json", 400)]
     [InlineData("POST", "/api/todos", "/api/todos", "{neplatný json", "application/json", 400)]
     [InlineData("POST", "/api/todos", "/api/todos", "Úkol", "text/plain", 415)]
@@ -373,6 +394,7 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
 
         public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default) => throw Failure();
 
-        public Task<int> CountAsync(CancellationToken cancellationToken = default) => throw Failure();
+        public Task<int> CountAsync(string? userId = null, bool? isCompleted = null, CancellationToken cancellationToken = default) =>
+            throw Failure();
     }
 }
