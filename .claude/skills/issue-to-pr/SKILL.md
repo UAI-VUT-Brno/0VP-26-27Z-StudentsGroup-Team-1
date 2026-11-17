@@ -18,7 +18,7 @@ Raw arguments: `$ARGUMENTS`
 - **Working directory:** always the repository root. Never use `cd`.
 - **Run folder:** keep all run data in `.issue-to-pr/<n>/`, where `<n>` is the issue number. The folder is git-ignored. Create it with the Write tool, not with `mkdir`.
 - **Run log:** append one line per stage to `.issue-to-pr/<n>/run.md` in the form `- <UTC time> | <stage> | <result>`. Get the time with `date -u +%H:%M:%S`.
-- **Rules:** the agents are grounded in the files in [rules/](rules/). Pass the path of that folder to every subagent.
+- **Pack folder:** the agents read their prompt from [prompts/](prompts/) and their rules from [rules/](rules/). Pass the pack folder `.claude/skills/issue-to-pr/` to every subagent.
 - **Never** force-push, merge a PR, close or edit an issue, rewrite history, delete branches, or change files outside the plan.
 
 ## Stage 0 – Parse the input
@@ -56,7 +56,7 @@ Create `.issue-to-pr/<n>/run.md` with the heading `# Run of /issue-to-pr #<n>` a
 
 Delegate to the subagent **`issue-to-pr:planner`**. Give it:
 - the issue number and the path `.issue-to-pr/<n>/issue.json`,
-- the rules folder `.claude/skills/issue-to-pr/rules/`.
+- the pack folder `.claude/skills/issue-to-pr/`.
 
 The planner is read-only and returns the plan as its final message. Save that message to `.issue-to-pr/<n>/plan.md`.
 
@@ -82,18 +82,18 @@ Log `branch | <branch name>`.
 Delegate to the subagent **`issue-to-pr:implementer`**. Give it:
 - the issue number,
 - the paths `.issue-to-pr/<n>/issue.json` and `.issue-to-pr/<n>/plan.md`,
-- the rules folder.
+- the pack folder.
 
-It implements the plan layer by layer (DTO → Data → API), writes the tests, and commits with Conventional Commits. It returns the list of commits.
+It implements the plan layer by layer (DTO → Data → API), writes the tests, and commits with Conventional Commits. It returns the list of commits and any deviations from the plan.
 
-Log `implement | <number of commits> commits`.
+Log `implement | <number of commits> commits`. If it reported deviations, copy them to `run.md` under a `## Deviations from the plan` heading, so the release agent can put them in the PR.
 
 ## Stage 6 – Verify and repair
 
 Delegate to the subagent **`issue-to-pr:qa`**. Give it:
 - the issue number,
 - the path `.issue-to-pr/<n>/plan.md`,
-- the rules folder,
+- the pack folder,
 - the attempt ceiling **4**.
 
 It runs `dotnet test --configuration Release`, repairs failures and reruns, up to 4 attempts in total. It returns:
@@ -109,8 +109,8 @@ Copy these values to `run.md` under a `## Verification` heading. Log `verify | <
 
 Delegate to the subagent **`issue-to-pr:release`**. Give it:
 - the issue number, branch, base branch and issue title,
-- the paths `.issue-to-pr/<n>/plan.md` and `.issue-to-pr/<n>/run.md`,
-- the rules folder.
+- the paths `.issue-to-pr/<n>/issue.json`, `.issue-to-pr/<n>/plan.md` and `.issue-to-pr/<n>/run.md`,
+- the pack folder.
 
 It:
 1. updates `docs/` and `README.md` when a public contract or configuration changed;
