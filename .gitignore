@@ -18,5 +18,11 @@ appsettings.*.local.json
 ## Data úkolů uložená při lokálním spuštění
 src/UAI.ZeroVP.API/data/
 
+## Pracovní data běhů /issue-to-pr (plán, log, tělo PR)
+.issue-to-pr/
+
+## Lokální nastavení Claude Code
+.claude/settings.local.json
+
 ## Ostatní
 *.log
