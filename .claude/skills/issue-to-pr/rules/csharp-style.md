@@ -44,5 +44,5 @@ The existing code does **not** pass `dotnet format` as a whole. Do not reformat 
 
 ## Build
 
-- The build must have **no new warnings**. Security analyzer rules (`CA2xxx`, `CA3xxx`, `CA5xxx`) are errors (`.editorconfig`).
+- The build must have **no new warnings**. Every analyzer rule in the Security category (for example `CA2100`, `CA3075`, `CA5350`) is an error (`dotnet_analyzer_diagnostic.category-Security.severity = error` in `.editorconfig`).
 - Medium and higher NuGet vulnerabilities fail the build (`Directory.Build.props`). Do not add packages unless the issue requires it. If you must, use the latest stable version.
