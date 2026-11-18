@@ -1,0 +1,8 @@
+{
+  "name": "issue-to-pr",
+  "description": "Autonomous implementation of a GitHub issue of UAI.ZeroVP: plan, layered C# implementation, self-healing build-and-test loop, docs sync and a verified pull request.",
+  "version": "0.1.0",
+  "author": {
+    "name": "0VP Team 1"
+  }
+}
