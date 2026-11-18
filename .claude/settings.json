@@ -4,7 +4,7 @@
     "allow": [
       "Bash(git status *)",
       "Bash(git switch *)",
-      "Bash(git pull --ff-only *)",
+      "Bash(git pull --ff-only origin *)",
       "Bash(git fetch *)",
       "Bash(git rev-parse *)",
       "Bash(git ls-remote *)",
@@ -33,6 +33,17 @@
       "Bash(git push -f *)",
       "Bash(git push * -f *)",
       "Bash(git push *--force*)",
+      "Bash(git push -u origin feat/t1-* *)",
+      "Bash(git push * -f)",
+      "Bash(git push *+*)",
+      "Bash(git push *:**)",
+      "Bash(git push *--delete*)",
+      "Bash(git push * -d *)",
+      "Bash(git push * -d)",
+      "Bash(git push *--no-verify*)",
+      "Bash(git push *--all*)",
+      "Bash(git push *--mirror*)",
+      "Bash(git push *--prune*)",
       "Bash(git reset --hard *)",
       "Bash(git clean *)",
       "Bash(git branch -D *)",
@@ -40,5 +51,8 @@
       "Bash(gh issue close *)",
       "Bash(gh issue edit *)"
     ]
+  },
+  "attribution": {
+    "pr": ""
   }
 }
