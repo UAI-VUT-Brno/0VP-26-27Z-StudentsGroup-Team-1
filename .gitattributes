@@ -1,2 +1,3 @@
 # Shellové skripty musí mít LF i po checkoutu na Windows.
 *.sh text eol=lf
+docs/report/issue-to-pr-report.pdf binary
