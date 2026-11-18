@@ -33,6 +33,7 @@ Follow `prompts/implement-csharp.md`: DTO → Data → API, with tests, build, f
   - `dotnet build`;
   - `dotnet format whitespace`;
   - `git add`, `git commit`, `git status`, `git diff`, `git log`.
+- To read or search files, use Read, Grep and Glob, not `cat`, `ls`, `find` or `grep`. Any other command is outside the allowlist in `.claude/settings.json`. It waits for approval and stalls an unattended run.
 
 ## Return
 

@@ -14,7 +14,7 @@ Raw arguments: `$ARGUMENTS`
 ## Operating rules
 
 - **No human in the loop.** Do not ask the user anything, and do not wait for confirmation between stages. If a stage cannot continue, stop as described in [Stop conditions](#stop-conditions).
-- **Shell:** run every shell command with the **Bash** tool, one command per call. Do not chain commands with `&&`, `;` or `|` unless a stage says so. The permission allowlist in `.claude/settings.json` matches single commands.
+- **Shell:** run every shell command with the **Bash** tool, one command per call. Do not chain commands with `&&`, `;` or `|` unless a stage says so. The permission allowlist in `.claude/settings.json` matches single commands. Run only the commands named in the stages, and use Read, Grep and Glob instead of shell commands for files. Any other command waits for approval and stalls the run.
 - **Working directory:** always the repository root. Never use `cd`.
 - **Run folder:** keep all run data in `.issue-to-pr/<n>/`, where `<n>` is the issue number. The folder is git-ignored. Create it with the Write tool, not with `mkdir`.
 - **Run log:** append one line per stage to `.issue-to-pr/<n>/run.md` in the form `- <UTC time> | <stage> | <result>`. Get the time with `date -u +%H:%M:%S`.
@@ -41,7 +41,9 @@ Run these checks. Any failure stops the run before a branch is created.
 
 1. `git status --porcelain`: the output must be empty. Otherwise stop with `Working tree is not clean`.
 2. `gh auth status`: it must succeed.
-3. `git switch <base>`, then `git pull --ff-only`. The base branch must be up to date with `origin`.
+3. `git fetch origin <base>`: the base branch must exist on `origin`. This also makes a base that exists only on `origin` (for example `benchmark/base-t1-10`) available locally.
+4. `git switch <base>`. If the branch exists only on `origin`, `git switch` creates a local tracking branch.
+5. `git pull --ff-only origin <base>`. The base branch must be up to date with `origin`.
 
 Create `.issue-to-pr/<n>/run.md` with the heading `# Run of /issue-to-pr #<n>` and log `preflight | ok`.
 
@@ -141,7 +143,7 @@ Run log:   .issue-to-pr/<n>/run.md
 | Condition | Stage | Effect |
 |---|---|---|
 | Invalid input | 0 | stop, nothing changed |
-| Dirty working tree, `gh` not authenticated, base not fast-forwardable | 1 | stop, nothing changed |
+| Dirty working tree, `gh` not authenticated, base missing on `origin` or not fast-forwardable | 1 | stop, nothing changed |
 | Issue missing or closed | 2 | stop, nothing changed |
 | Issue not implementable | 3 | stop, no branch |
 | Branch already exists | 4 | stop, no branch |

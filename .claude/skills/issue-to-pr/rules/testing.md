@@ -16,6 +16,7 @@
 | `tests/API/` unit | controllers called directly | `new TodosController(repository, FakeTimeProvider, NullLogger<T>.Instance)` over a real `InMemoryTodoRepository` with `SeedSampleData = false` |
 | `tests/API/` integration | real HTTP | `IClassFixture<ApiTestFactory>` (in memory) or `PersistentApiTestFactory` (JSON file) |
 | `tests/OpenApi/` | the generated OpenAPI document | `OpenApiTestFactory` |
+| `tests/Performance/` | response-time load tests (500 ms budget) | `PerformanceApiFactory`, `[PerformanceFact]`. Skipped unless `RUN_PERFORMANCE_TESTS=true`. Do not add tests here unless the issue is about performance |
 
 - Namespace: `UAI.ZeroVP.Tests.<Folder>`.
 - Class name: `<Subject>Tests`.

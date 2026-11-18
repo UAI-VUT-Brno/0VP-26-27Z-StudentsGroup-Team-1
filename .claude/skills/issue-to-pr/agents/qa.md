@@ -41,7 +41,8 @@ Attempt 1 is the first run. Every later attempt is a repair cycle, so a ceiling 
 
 - The hard limits in `repair-diagnostics.md` apply. Above all: never delete, skip or weaken a test.
 - Do not push.
-- Bash: one command per call, no `cd`, no command chains.
+- Bash: one command per call, no `cd`, no command chains. Allowed commands: `dotnet test`, `dotnet build`, `dotnet format whitespace`, `git add`, `git commit`, `git status`, `git diff`, `git log`.
+- Run only the commands named in your steps. To read or search files, use Read, Grep and Glob, not `cat`, `ls`, `find` or `grep`. Any other command is outside the allowlist in `.claude/settings.json`. It waits for approval and stalls an unattended run.
 
 ## Return
 
