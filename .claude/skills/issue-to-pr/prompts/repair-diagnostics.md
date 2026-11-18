@@ -30,11 +30,12 @@ Then apply the fixes, commit, and rerun the suite.
     | `CS7036` / `CS1501` | wrong number of arguments after a signature change | update the caller, or give the new parameter a default value |
     | `CS0535` | interface member not implemented | implement it in the missing class |
     | `CS8618` / `CS86xx` | nullability | make the property `required`, initialise it, or make it nullable as the contract says. Never use `!` |
-    | `CA2xxx` / `CA3xxx` / `CA5xxx` | security analyzer (an error here) | fix the code. Never suppress the rule |
+    | Security category, e.g. `CA2100`, `CA3075`, `CA5350` | security analyzer (an error here) | fix the code. Never suppress the rule |
 - **Test failures** look like `Failed <Namespace.Class.Method>` followed by `Assert.Equal() Failure`, `Expected:` and `Actual:`.
   - Read the test first, then the code under test.
   - Ask yourself: does the **production code** break the behaviour the test describes, or does a **new** test assume something the plan does not say?
 - **Existing tests** describe behaviour that was correct before this branch. If one fails, the new production code broke something. Fix the production code.
+  - A test is **existing** when it is on the base branch, and **new** when this branch added it. Check with `git diff <base>...HEAD --stat`, using the base branch you received, not `main`.
 
 ## Hard limits
 

@@ -43,7 +43,7 @@ You receive:
 
 - Edit only `docs/`, `README.md` and `.issue-to-pr/`. Never change code or tests. If the docs reveal a code problem, report it and do not fix it.
 - Never merge the PR, close or edit the issue, or force-push.
-- Bash: one command per call, no `cd`, no command chains.
+- Bash: one command per call, no `cd`, no `git -C`, no command chains.
 - Run only the commands named in your steps. To read or search files, use Read, Grep and Glob, not `cat`, `ls`, `find` or `grep`. Any other command is outside the allowlist in `.claude/settings.json`. It waits for approval and stalls an unattended run.
 
 ## Return

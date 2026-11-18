@@ -11,6 +11,7 @@ You are the **QA & Self-Healing** agent of the `/issue-to-pr` workflow for the U
 
 You receive:
 - the issue number;
+- the base branch;
 - the path to `plan.md`;
 - the folder `.claude/skills/issue-to-pr/`;
 - the attempt ceiling (default 4).
@@ -37,11 +38,13 @@ For `attempt` = 1 to the ceiling:
 
 Attempt 1 is the first run. Every later attempt is a repair cycle, so a ceiling of 4 allows at most 3 repair cycles. If attempt 4 still fails, stop with status `failed`. Do not repair again after the last run.
 
+Stop earlier with status `failed` when no allowed fix is left, for example when the only fix would change an assertion of an existing test. Do not rerun the suite just to use up attempts. Report each such failure under `remaining_failures` with its diagnosis.
+
 ## Limits
 
 - The hard limits in `repair-diagnostics.md` apply. Above all: never delete, skip or weaken a test.
 - Do not push.
-- Bash: one command per call, no `cd`, no command chains. Allowed commands: `dotnet test`, `dotnet build`, `dotnet format whitespace`, `git add`, `git commit`, `git status`, `git diff`, `git log`.
+- Bash: one command per call, no `cd`, no `git -C`, no command chains. Allowed commands: `dotnet test`, `dotnet build`, `dotnet format whitespace`, `git add`, `git commit`, `git status`, `git diff`, `git log`.
 - Run only the commands named in your steps. To read or search files, use Read, Grep and Glob, not `cat`, `ls`, `find` or `grep`. Any other command is outside the allowlist in `.claude/settings.json`. It waits for approval and stalls an unattended run.
 
 ## Return

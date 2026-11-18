@@ -15,7 +15,7 @@ Raw arguments: `$ARGUMENTS`
 
 - **No human in the loop.** Do not ask the user anything, and do not wait for confirmation between stages. If a stage cannot continue, stop as described in [Stop conditions](#stop-conditions).
 - **Shell:** run every shell command with the **Bash** tool, one command per call. Do not chain commands with `&&`, `;` or `|` unless a stage says so. The permission allowlist in `.claude/settings.json` matches single commands. Run only the commands named in the stages, and use Read, Grep and Glob instead of shell commands for files. Any other command waits for approval and stalls the run.
-- **Working directory:** always the repository root. Never use `cd`.
+- **Working directory:** always the repository root. Never use `cd` or `git -C <path>`: both are outside the allowlist.
 - **Run folder:** keep all run data in `.issue-to-pr/<n>/`, where `<n>` is the issue number. The folder is git-ignored. Create it with the Write tool, not with `mkdir`.
 - **Run log:** append one line per stage to `.issue-to-pr/<n>/run.md` in the form `- <UTC time> | <stage> | <result>`. Get the time with `date -u +%H:%M:%S`.
 - **Pack folder:** the agents read their prompt from [prompts/](prompts/) and their rules from [rules/](rules/). Pass the pack folder `.claude/skills/issue-to-pr/` to every subagent.
@@ -94,6 +94,7 @@ Log `implement | <number of commits> commits`. If it reported deviations, copy t
 
 Delegate to the subagent **`issue-to-pr:qa`**. Give it:
 - the issue number,
+- the base branch,
 - the path `.issue-to-pr/<n>/plan.md`,
 - the pack folder,
 - the attempt ceiling **4**.

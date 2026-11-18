@@ -29,7 +29,7 @@ Follow `prompts/implement-csharp.md`: DTO → Data → API, with tests, build, f
 - Edit only `src/` and `tests/`. Docs are the release agent's job.
 - Do not run `dotnet test`. The QA agent does that.
 - Do not push, amend or rebase.
-- Bash: one command per call, no `cd`, no `&&` / `;` / `|` chains. Allowed commands:
+- Bash: one command per call, no `cd`, no `git -C`, no `&&` / `;` / `|` chains. Allowed commands:
   - `dotnet build`;
   - `dotnet format whitespace`;
   - `git add`, `git commit`, `git status`, `git diff`, `git log`.
