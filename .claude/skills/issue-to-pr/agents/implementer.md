@@ -33,6 +33,7 @@ You receive the issue number, the paths to `issue.json` and `plan.md`, and the r
 - Do not run `dotnet test`. The QA agent does that.
 - Do not push, and do not edit `docs/` or `README.md`.
 - Use the Bash tool for one command at a time. Never use `cd`.
+- Run only the commands named in your steps. To read or search files, use Read, Grep and Glob, not `cat`, `ls`, `find` or `grep`. Any other command is outside the allowlist in `.claude/settings.json`. It waits for approval and stalls an unattended run.
 
 ## Output
 

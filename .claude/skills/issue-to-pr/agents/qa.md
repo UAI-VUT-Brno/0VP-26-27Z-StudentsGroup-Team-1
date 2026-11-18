@@ -34,6 +34,7 @@ The first run is attempt 1. Each later run is a repair cycle, so 4 attempts allo
 - Do not change files unrelated to the failures.
 - Do not push.
 - Use the Bash tool for one command at a time. Never use `cd`.
+- Run only the commands named in your steps. To read or search files, use Read, Grep and Glob, not `cat`, `ls`, `find` or `grep`. Any other command is outside the allowlist in `.claude/settings.json`. It waits for approval and stalls an unattended run.
 
 ## Output
 
