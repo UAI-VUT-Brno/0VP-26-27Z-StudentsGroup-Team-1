@@ -27,10 +27,10 @@ Both skips are existing opt-in load tests.
 
 ## Run procedure
 
-Start after the benchmark protocol is merged. Approach B also requires the merged orchestrator, rules, subagents and prompts. For each case, complete A before opening B's solution. Use an independent fresh clone per run, start on the base branch shown above, and confirm that `git rev-parse HEAD` matches the pinned commit and `git status --porcelain` is empty. Use the same issue text, machine, .NET SDK and environment for both approaches. Record any deviations with the result. Capture tool versions and the selected model in each run. Use the same package-cache policy across all four runs.
+Use the protocol revision recorded with the evidence. For B, pin a complete revision of the orchestrator, rules, subagents and prompts. For each case, complete A before starting B. Use an independent fresh clone per run, start on the base branch shown above, and confirm that `git rev-parse HEAD` matches the pinned commit and `git status --porcelain` is empty. Use the same issue text, machine, .NET SDK and environment for both approaches. Record any deviations with the result. Capture tool versions and the selected model in each run. Use the same package-cache policy across all four runs.
 
 - **A — Interactive GitHub Copilot in VS Code.** Use inline completions, Copilot Chat with workspace context (`@workspace`), and manual debugging. Use a distinct working branch such as `benchmark/copilot-53` or `benchmark/copilot-54` and open the PR against the case's base. Capture the screen or keep timestamped notes of prompts, edits, commands and test outcomes. Record VS Code, Copilot and model versions or identifiers.
-- **B — Claude Code `/issue-to-pr`.** Take the complete `.claude/skills/issue-to-pr/` pack and `.claude/settings.json` from one pinned commit containing the merged workflow. Neither benchmark base contains the pack. Copy those files into each B clone at their expected paths before timing, and locally exclude `/.claude/` and `/.issue-to-pr/` in that clone's `.git/info/exclude`. Record the workflow commit. Verify the working tree is clean, `gh auth status` succeeds, the plugin and its four agents are available, and workspace trust is already set. Start the screen recording and enter the single command below. Leave the session untouched until it finishes. Export the transcript and preserve `.issue-to-pr/<issue>/run.md` along with the PR link. Record Claude Code, GitHub CLI and model versions or identifiers.
+- **B — Claude Code `/issue-to-pr`.** Take the complete `.claude/skills/issue-to-pr/` pack and `.claude/settings.json` from the pinned workflow commit. Copy those files into each B clone at their expected paths before timing, and locally exclude `/.claude/` and `/.issue-to-pr/` in that clone's `.git/info/exclude`. Record the workflow commit. Verify the working tree is clean, `gh auth status` succeeds, Claude Code is signed in, the workspace is trusted, and the plugin and its four agents are available. Start the screen recording and enter the single command below. Leave the session untouched until it finishes. Export the transcript and preserve `.issue-to-pr/<issue>/run.md` along with the PR link. Record Claude Code, GitHub CLI and model versions or identifiers.
 
 ```text
 /issue-to-pr #53 --base benchmark/base-t1-10
@@ -60,15 +60,26 @@ Use **pass**, **fail**, or **not applicable** with a short reason for every item
 
 Fill one row per run. Link the timestamped event log or recording, the first and final test outputs, and the completed review. Put any screenshots under `docs/img/`.
 
+**Status on 2026-11-18.** The four trials are pending at preflight. A dash marks an unmeasured value.
+
 | Case | Approach | Tools and model | Start/end UTC and elapsed time | Human interventions | First attempt | Repair cycles | Final tests (passed/failed/skipped) | PR and result | Review and evidence |
 | --- | --- | --- | --- | ---: | --- | --- | --- | --- | --- |
-| Historical | A — Copilot | — | — | — | — | — | — | — | — |
-| Historical | B — /issue-to-pr | — | — | — | — | — | — | — | — |
-| Synthetic | A — Copilot | — | — | — | — | — | — | — | — |
-| Synthetic | B — /issue-to-pr | — | — | — | — | — | — | — | — |
+| Historical | A — Copilot | VS Code 1.110.1, Copilot Chat 0.38.2 | — | — | — | — | — | Sign-in and trust pending | Preflight below |
+| Historical | B — /issue-to-pr | Claude Code 2.1.327, GitHub CLI 2.105.0 | — | — | — | — | — | Sign-in, trust and A pending | Preflight below |
+| Synthetic | A — Copilot | VS Code 1.110.1, Copilot Chat 0.38.2 | — | — | — | — | — | Sign-in and trust pending | Preflight below |
+| Synthetic | B — /issue-to-pr | Claude Code 2.1.327, GitHub CLI 2.105.0 | — | — | — | — | — | Sign-in, trust and A pending | Preflight below |
+
+### Execution preflight
+
+- **Protocol:** setup commit `6a6d077234086b77b5da70001a4bddb7704e50dc` and this execution update.
+- **Source:** four fresh clones matched the case SHAs above and had empty `git status --porcelain` output. Both Claude Code clones remained clean after the workflow and run directory were excluded locally.
+- **Workflow:** [`ecaf1bf582858d40d7820c14ec37718b0e130d50`](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/commit/ecaf1bf582858d40d7820c14ec37718b0e130d50) includes the orchestrator, rules and prompt library. `claude plugin validate <pack> --strict` passed and identified the skill and all four agents.
+- **GitHub:** GitHub CLI authenticated using the existing repository credential and reported both fixtures open with the `benchmark` label.
+- **Models:** selection and identifiers are pending authenticated sessions. Start the timer only when the runner first opens the fixture for a trial.
 
 ### Failure and edge-case log
 
 | Run and UTC time | Stage | Observation and impact | Resolution or stop reason | Evidence |
 | --- | --- | --- | --- | --- |
-| — | — | — | — | — |
+| A preflight, 2026-11-18 | IDE setup | The historical clone opened in VS Code Restricted Mode. The chat UI requested sign-in and showed Copilot disabled. | Trust the fixture workspace and sign in to Copilot before timing. | VS Code workspace and chat status |
+| B preflight, 2026-11-18 | Authentication and discovery | `claude auth status --text` reported no login. `claude plugin list --json` reported a suppressed project skill directory in both clones, and `claude agents --json` returned an empty list in both. | Sign in, trust each clone and relaunch or reload the plugin before timing. | Claude Code auth, plugin and agent commands |
