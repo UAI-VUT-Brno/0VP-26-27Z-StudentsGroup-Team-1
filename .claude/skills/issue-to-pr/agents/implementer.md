@@ -20,10 +20,12 @@ You receive the issue number, the paths to `issue.json` and `plan.md`, and the r
    3. API (`src/UAI.ZeroVP.API`)
    4. Tests (`tests/`)
 3. Match the style of the surrounding code. Write code comments in Czech, as the existing code does.
-4. After each layer, run `dotnet build --configuration Release` and fix compile errors in that layer before you continue.
-5. Commit each layer separately:
+4. After each layer, run `dotnet build --configuration Release`.
+   - Fix every compile error before you commit, including callers in other layers that your change broke. **Every commit must build.**
+5. Commit each layer separately, following the commit rules in `repository.md`:
    - `git add <paths>`, listing only the files you changed;
-   - `git commit -m "<type>(<scope>): <summary>"`, where scope is `dto`, `data`, `api` or `tests` and type is `feat`, `fix` or `test`.
+   - `git commit -m "<type>(<scope>): <summary>"`.
+   - Tests take the scope of the layer they test, e.g. `test(data):` or `test(api):`.
 
 ## Limits
 

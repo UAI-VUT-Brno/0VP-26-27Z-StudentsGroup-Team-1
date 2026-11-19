@@ -17,8 +17,8 @@ You receive the issue number, the issue title, the branch, the base branch, the 
    - Read the plan's "Documentation" section and the diff: `git diff <base>...HEAD --stat`, then `git diff <base>...HEAD`.
    - If a public contract (DTO, endpoint, MCP tool) or a configuration key changed, update the relevant file in `docs/` and `README.md`. Docs are in English.
    - Edit only `docs/` and `README.md`.
-   - Commit: `git add <paths>`, then `git commit -m "docs(<scope>): <summary>"`. The scope is the area whose documentation changed: `api`, `dto`, `data`, `mcp` or `config`.
-2. **Whitespace check.** Run `git diff --check <base>...HEAD`. Fix any reported problem and commit it with `style(<scope>): fix whitespace`, where the scope is the layer of the fixed files (`dto`, `data`, `api`, `tests` or `docs`).
+   - Commit: `git add <paths>`, then `git commit -m "docs(<scope>): <summary>"`. The scope is the area whose documentation changed, from the scope table in `repository.md`, e.g. `docs(api):`, `docs(mcp):` or `docs(docker):`.
+2. **Whitespace check.** Run `git diff --check <base>...HEAD`. Fix any reported problem and commit it with `style(<scope>): fix whitespace`, where the scope is the area of the fixed files from the same table.
 3. **Push.** Run `git push -u origin <branch>`. Never use `--force`.
 4. **PR body.** Write it to `.issue-to-pr/<n>/pr-body.md` in the repository, next to `run.md`. Do not write it to a scratchpad or temp folder: the run folder is the record of the run.
 
@@ -51,10 +51,10 @@ You receive the issue number, the issue title, the branch, the base branch, the 
    - Take the verification values from the `## Verification` section of `run.md`.
    - `Closes #<n>` must be the **last line** of the body. Do not add anything after it, including an attribution line. The attribution line above it is the only one.
 5. **Create the PR.**
-   - Title: `[0VP-T1-NN] <rest of the issue title>`, following the repository convention. Take `0VP-T1-NN` from the start of the issue title, where `NN` is the task code and **not** the issue number. Examples:
+   - Title: follow `repository.md`, i.e. `[0VP-T1-NN] <rest of the issue title>`. Take `0VP-T1-NN` from the start of the issue title, where `NN` is the task code and **not** the issue number. Examples:
      - issue title `0VP-T1-20 Benchmark: Add user identification to tasks` → PR title `[0VP-T1-20] Benchmark: Add user identification to tasks`;
      - issue title `0VP-T1-TEST Add task count endpoint` → PR title `[0VP-T1-TEST] Add task count endpoint`.
-   - If the issue title has no `0VP-T1-…` prefix, use `[0VP-T1] <issue title>`.
+   - If the issue title has no `0VP-T1-…` prefix, use `<type>: <issue title>`, where `<type>` is `feat` or `fix`.
    - Run `gh pr create --base <base> --head <branch> --title "<title>" --body-file .issue-to-pr/<n>/pr-body.md`.
    - Add `--draft` when verification failed.
 
