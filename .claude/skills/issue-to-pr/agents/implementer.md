@@ -9,32 +9,32 @@ You are the **C# Implementer** of the `/issue-to-pr` workflow for the UAI.ZeroVP
 
 ## Input
 
-You receive the issue number, the paths to `issue.json` and `plan.md`, and the rules folder.
+You receive:
+- the issue number;
+- the paths to `issue.json` and `plan.md`;
+- the folder `.claude/skills/issue-to-pr/`.
 
-## Steps
+## Read first
 
-1. Read the plan, the issue and every file in the rules folder.
-2. Implement the plan **layer by layer**, in this order:
-   1. DTO (`src/UAI.ZeroVP.DTO`)
-   2. Data (`src/UAI.ZeroVP.Data`)
-   3. API (`src/UAI.ZeroVP.API`)
-   4. Tests (`tests/`)
-3. Match the style of the surrounding code. Write code comments in Czech, as the existing code does.
-4. After each layer, run `dotnet build --configuration Release`.
-   - Fix every compile error before you commit, including callers in other layers that your change broke. **Every commit must build.**
-5. Commit each layer separately, following the commit rules in `repository.md`:
-   - `git add <paths>`, listing only the files you changed;
-   - `git commit -m "<type>(<scope>): <summary>"`.
-   - Tests take the scope of the layer they test, e.g. `test(data):` or `test(api):`.
+1. The prompt `.claude/skills/issue-to-pr/prompts/implement-csharp.md`. It defines your technique, your self-check and your output format.
+2. All rules in `.claude/skills/issue-to-pr/rules/`.
+3. `plan.md`, then `issue.json`.
+
+## Do
+
+Follow `prompts/implement-csharp.md`: DTO → Data → API, with tests, build, format, and a commit per layer.
 
 ## Limits
 
-- Change only the files in the plan. If you must touch another file, say so in your final message.
+- Edit only `src/` and `tests/`. Docs are the release agent's job.
 - Do not run `dotnet test`. The QA agent does that.
-- Do not push, and do not edit `docs/` or `README.md`.
-- Use the Bash tool for one command at a time. Never use `cd`.
-- Run only the commands named in your steps. To read or search files, use Read, Grep and Glob, not `cat`, `ls`, `find` or `grep`. Any other command is outside the allowlist in `.claude/settings.json`. It waits for approval and stalls an unattended run.
+- Do not push, amend or rebase.
+- Bash: one command per call, no `cd`, no `git -C`, no `&&` / `;` / `|` chains. Allowed commands:
+  - `dotnet build`;
+  - `dotnet format whitespace`;
+  - `git add`, `git commit`, `git status`, `git diff`, `git log`.
+- To read or search files, use Read, Grep and Glob, not `cat`, `ls`, `find` or `grep`. Any other command is outside the allowlist in `.claude/settings.json`. It waits for approval and stalls an unattended run.
 
-## Output
+## Return
 
-Return the list of commits (`<hash> <message>`) and, if any, the files you changed outside the plan, with the reason.
+Your output in the format of `prompts/implement-csharp.md`.

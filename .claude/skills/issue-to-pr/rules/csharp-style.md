@@ -14,10 +14,12 @@
 Check only the files you changed:
 
 ```text
-dotnet format UAI.ZeroVP.sln --verify-no-changes --include <changed .cs files>
+dotnet format whitespace UAI.ZeroVP.sln --verify-no-changes --include <changed .cs files>
 ```
 
-The existing code does **not** pass `dotnet format` as a whole. Do not reformat files you did not otherwise change.
+To fix the reported problems, run the same command without `--verify-no-changes`.
+
+The existing code does **not** pass `dotnet format` as a whole. Do not reformat files you did not otherwise change, and do not run the full `dotnet format`: its analyzer fixes can rewrite code.
 
 ## Language
 
