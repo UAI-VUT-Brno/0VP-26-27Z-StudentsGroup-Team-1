@@ -138,6 +138,45 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
         Assert.Equal("date-time", firstDue.Format);
     }
 
+    // AC 8: oba požadavky na založení uvádějí userId jako povinný, s délkou 1–100 znaků.
+    [Theory]
+    [InlineData("CreateTodoItemRequest")]
+    [InlineData("CreateRepeatingTodoItemRequest")]
+    public async Task UserId_IsDocumentedAsRequiredWithLengthLimits(string schemaName)
+    {
+        var schema = await LoadSchemaAsync(schemaName);
+
+        Assert.NotNull(schema.Required);
+        Assert.Contains("userId", schema.Required);
+        Assert.NotNull(schema.Properties);
+        var userId = Assert.Contains("userId", schema.Properties);
+        Assert.Equal(1, userId.MinLength);
+        Assert.Equal(100, userId.MaxLength);
+    }
+
+    // AC 3, 8: odpověď uvádí userId vždy (required), jako řetězec nebo null u úkolů ze starších souborů.
+    [Fact]
+    public async Task TodoItemDto_DocumentsUserIdAsRequired()
+    {
+        var schema = await LoadSchemaAsync("TodoItemDto");
+
+        Assert.NotNull(schema.Required);
+        Assert.Contains("userId", schema.Required);
+        Assert.NotNull(schema.Properties);
+        Assert.Equal(JsonSchemaType.String | JsonSchemaType.Null, Assert.Contains("userId", schema.Properties).Type);
+    }
+
+    // AC 6, 8: vlastníka nejde změnit, proto ho schéma úpravy vůbec neuvádí.
+    [Fact]
+    public async Task UpdateRequest_DoesNotDocumentUserId()
+    {
+        var schema = await LoadSchemaAsync("UpdateTodoItemRequest");
+
+        Assert.NotNull(schema.Properties);
+        Assert.DoesNotContain("userId", schema.Properties.Keys);
+        Assert.DoesNotContain("userId", schema.Required ?? new HashSet<string>());
+    }
+
     [Fact]
     public async Task CreatedResponse_DocumentsLocationHeader()
     {
@@ -284,6 +323,14 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
         var json = await _client.GetStringAsync("/openapi/v1.json");
 
         return OpenApiDocument.Parse(json, OpenApiConstants.Json).Document!;
+    }
+
+    private async Task<IOpenApiSchema> LoadSchemaAsync(string name)
+    {
+        var schemas = (await LoadDocumentAsync()).Components?.Schemas;
+        Assert.NotNull(schemas);
+
+        return Assert.Contains(name, schemas);
     }
 
     private static OpenApiOperation GetOperation(OpenApiDocument document, string method, string path)

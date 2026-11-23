@@ -31,7 +31,8 @@ public sealed class TodosControllerTests
     private async Task<TodoItem> AddItemAsync(
         string title = "Úkol",
         TodoPriority priority = TodoPriority.Normal,
-        bool isCompleted = false) =>
+        bool isCompleted = false,
+        string? userId = null) =>
         await _repository.AddAsync(new TodoItem
         {
             Id = Guid.NewGuid(),
@@ -40,6 +41,7 @@ public sealed class TodosControllerTests
             IsCompleted = isCompleted,
             CreatedAtUtc = Now.AddDays(-1),
             CompletedAtUtc = isCompleted ? Now.AddHours(-1) : null,
+            UserId = userId,
             UpdatedAtUtc = Now.AddDays(-1)
         });
 
@@ -95,6 +97,19 @@ public sealed class TodosControllerTests
         Assert.Equal(isCompleted, Assert.Single(items).IsCompleted);
     }
 
+    // AC 3: seznam vrací vlastníka každého úkolu, u úkolu bez vlastníka null.
+    [Fact]
+    public async Task GetAll_ReturnsUserId()
+    {
+        var owned = await AddItemAsync("S vlastníkem", TodoPriority.High, userId: "jan.novak");
+        var legacy = await AddItemAsync("Bez vlastníka", TodoPriority.Low);
+
+        var items = AssertOk(await CreateController().GetAll(isCompleted: null, CancellationToken.None));
+
+        Assert.Equal("jan.novak", Assert.Single(items, item => item.Id == owned.Id).UserId);
+        Assert.Null(Assert.Single(items, item => item.Id == legacy.Id).UserId);
+    }
+
     // --- GET /api/todos/{id} ------------------------------------------------
 
     [Fact]
@@ -106,6 +121,17 @@ public sealed class TodosControllerTests
 
         Assert.Equal(item.Id, dto.Id);
         Assert.Equal("Napsat Dockerfile", dto.Title);
+    }
+
+    // AC 3: detail úkolu vrací jeho vlastníka.
+    [Fact]
+    public async Task GetById_ReturnsUserId()
+    {
+        var item = await AddItemAsync(userId: "jan.novak");
+
+        var dto = AssertOk(await CreateController().GetById(item.Id, CancellationToken.None));
+
+        Assert.Equal("jan.novak", dto.UserId);
     }
 
     [Fact]
@@ -150,7 +176,7 @@ public sealed class TodosControllerTests
         Assert.Equal(Now, stored.CreatedAtUtc);
         Assert.False(stored.IsCompleted);
     }
-    
+
     [Fact]
     public async Task Create_ReturnsItemWithoutDueDate()
     {
@@ -158,6 +184,21 @@ public sealed class TodosControllerTests
 
         var dto = Assert.IsType<TodoItemDto>(Assert.IsType<CreatedAtRouteResult>(result.Result).Value);
         Assert.Null(dto.DueAtUtc);
+    }
+
+    // AC 1: založený úkol vrátí i uloží oříznutého vlastníka.
+    [Fact]
+    public async Task Create_ReturnsAndStoresUserId()
+    {
+        var request = new CreateTodoItemRequest { Title = "Nový úkol", UserId = "  jan.novak  " };
+
+        var result = await CreateController().Create(request, CancellationToken.None);
+
+        var dto = Assert.IsType<TodoItemDto>(Assert.IsType<CreatedAtRouteResult>(result.Result).Value);
+        Assert.Equal("jan.novak", dto.UserId);
+        var stored = await _repository.GetByIdAsync(dto.Id);
+        Assert.NotNull(stored);
+        Assert.Equal("jan.novak", stored.UserId);
     }
 
     // --- POST /api/todos/repeat ---------------------------------------------
@@ -169,6 +210,7 @@ public sealed class TodosControllerTests
         Title = "Týdenní report",
         Description = "Shrnout týden.",
         Priority = TodoPriority.High,
+        UserId = "jan.novak",
         FirstDueAtUtc = FirstDue,
         RepeatCount = repeatCount
     };
@@ -243,6 +285,23 @@ public sealed class TodosControllerTests
         Assert.False(untouched.IsCompleted);
     }
 
+    // AC 1: každý výskyt opakovaného úkolu nese vlastníka v odpovědi i v úložišti.
+    [Fact]
+    public async Task CreateRepeating_EveryOccurrenceCarriesUserId()
+    {
+        var occurrences = AssertCreatedOccurrences(
+            await CreateController().CreateRepeating(CreateRepeatingRequest(repeatCount: 3), CancellationToken.None));
+
+        Assert.Equal(4, occurrences.Count);
+        foreach (var occurrence in occurrences)
+        {
+            Assert.Equal("jan.novak", occurrence.UserId);
+            var stored = await _repository.GetByIdAsync(occurrence.Id);
+            Assert.NotNull(stored);
+            Assert.Equal("jan.novak", stored.UserId);
+        }
+    }
+
     // --- PUT /api/todos/{id} ------------------------------------------------
 
     [Fact]
@@ -294,6 +353,21 @@ public sealed class TodosControllerTests
         AssertNotFoundProblem(result.Result, item.Id);
     }
 
+    // AC 6: úprava přes PUT vlastníka nezmění.
+    [Fact]
+    public async Task Update_KeepsOriginalUserId()
+    {
+        var item = await AddItemAsync("Původní", userId: "jan.novak");
+        var request = new UpdateTodoItemRequest { Title = "Nový název", Priority = TodoPriority.High };
+
+        var dto = AssertOk(await CreateController().Update(item.Id, request, CancellationToken.None));
+
+        Assert.Equal("jan.novak", dto.UserId);
+        var stored = await _repository.GetByIdAsync(item.Id);
+        Assert.NotNull(stored);
+        Assert.Equal("jan.novak", stored.UserId);
+    }
+
     // --- POST /api/todos/{id}/complete --------------------------------------
 
     [Fact]
@@ -337,6 +411,21 @@ public sealed class TodosControllerTests
         var result = await controller.Complete(item.Id, CancellationToken.None);
 
         AssertNotFoundProblem(result.Result, item.Id);
+    }
+
+    // AC 6: dokončení úkolu vlastníka zachová.
+    [Fact]
+    public async Task Complete_KeepsUserId()
+    {
+        var item = await AddItemAsync(userId: "jan.novak");
+
+        var dto = AssertOk(await CreateController().Complete(item.Id, CancellationToken.None));
+
+        Assert.True(dto.IsCompleted);
+        Assert.Equal("jan.novak", dto.UserId);
+        var stored = await _repository.GetByIdAsync(item.Id);
+        Assert.NotNull(stored);
+        Assert.Equal("jan.novak", stored.UserId);
     }
 
     // --- DELETE /api/todos/{id} ---------------------------------------------

@@ -23,6 +23,7 @@ public sealed class TodoMapperTests
         DueAtUtc = CreatedAt.AddDays(7),
         CreatedAtUtc = CreatedAt,
         CompletedAtUtc = isCompleted ? CreatedAt.AddHours(1) : null,
+        UserId = "jan.novak",
         UpdatedAtUtc = CreatedAt.AddHours(1)
     };
 
@@ -69,6 +70,30 @@ public sealed class TodoMapperTests
         Assert.Null(typeof(TodoItemDto).GetProperty(nameof(TodoItem.UpdatedAtUtc)));
     }
 
+    // AC 3: odpověď API nese vlastníka úkolu.
+    [Fact]
+    public void ToDto_CopiesUserId()
+    {
+        var dto = CreateEntity().ToDto();
+
+        Assert.Equal("jan.novak", dto.UserId);
+    }
+
+    // AC 7: úkol ze starší verze souboru vlastníka nemá – v odpovědi zůstane null, ne "".
+    [Fact]
+    public void ToDto_NullUserId_StaysNull()
+    {
+        var entity = new TodoItem
+        {
+            Id = Guid.NewGuid(),
+            Title = "Ze starého souboru",
+            CreatedAtUtc = CreatedAt,
+            UpdatedAtUtc = CreatedAt
+        };
+
+        Assert.Null(entity.ToDto().UserId);
+    }
+
     // --- ToEntity -----------------------------------------------------------
 
     [Fact]
@@ -94,7 +119,7 @@ public sealed class TodoMapperTests
 
         Assert.Null(request.ToEntity(Now).DueAtUtc);
     }
-    
+
     [Fact]
     public void ToEntity_EachCallGeneratesDifferentId()
     {
@@ -125,6 +150,24 @@ public sealed class TodoMapperTests
         Assert.Null(request.ToEntity(Now).Description);
     }
 
+    // AC 1, 5: userId se uloží oříznutý o okolní mezery.
+    [Fact]
+    public void ToEntity_TrimsUserId()
+    {
+        var request = new CreateTodoItemRequest { Title = "Úkol", UserId = "  jan.novak  " };
+
+        Assert.Equal("jan.novak", request.ToEntity(Now).UserId);
+    }
+
+    // AC 5: velikost písmen se zachová – userId se nijak nenormalizuje.
+    [Fact]
+    public void ToEntity_KeepsUserIdCase()
+    {
+        var request = new CreateTodoItemRequest { Title = "Úkol", UserId = "Jan.Novak" };
+
+        Assert.Equal("Jan.Novak", request.ToEntity(Now).UserId);
+    }
+
     // --- ToEntities (opakovaný úkol) ----------------------------------------
 
     private static readonly DateTimeOffset FirstDue = new(2026, 10, 26, 9, 0, 0, TimeSpan.Zero);
@@ -134,6 +177,7 @@ public sealed class TodoMapperTests
         Title = "  Týdenní report  ",
         Description = "  Shrnout týden.  ",
         Priority = TodoPriority.High,
+        UserId = "  jan.novak  ",
         FirstDueAtUtc = FirstDue,
         RepeatCount = repeatCount
     };
@@ -176,6 +220,16 @@ public sealed class TodoMapperTests
             Assert.Equal("Shrnout týden.", entity.Description);
             Assert.Equal(TodoPriority.High, entity.Priority);
         });
+    }
+
+    // AC 1: každý výskyt opakovaného úkolu dostane stejného, oříznutého vlastníka.
+    [Fact]
+    public void ToEntities_CopiesTrimmedUserIdToEveryOccurrence()
+    {
+        var entities = CreateRepeatingRequest(repeatCount: 3).ToEntities(Now);
+
+        Assert.Equal(4, entities.Count);
+        Assert.All(entities, entity => Assert.Equal("jan.novak", entity.UserId));
     }
 
     [Fact]
@@ -245,6 +299,17 @@ public sealed class TodoMapperTests
 
         Assert.Equal(originalId, entity.Id);
         Assert.Equal(CreatedAt, entity.CreatedAtUtc);
+    }
+
+    // AC 6: úprava úkolu vlastníka nemění – určuje se jen při vytvoření.
+    [Fact]
+    public void ApplyTo_KeepsUserId()
+    {
+        var entity = CreateEntity();
+
+        new UpdateTodoItemRequest { Title = "Nový název", IsCompleted = true }.ApplyTo(entity, Now);
+
+        Assert.Equal("jan.novak", entity.UserId);
     }
 
     [Fact]

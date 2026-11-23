@@ -29,7 +29,8 @@ Content-Type: application/json
 {
   "title": "Vyzkoušet docker build",
   "description": "Postavit image z vícefázového Dockerfile.",
-  "priority": "High"
+  "priority": "High",
+  "userId": "jan.novak"
 }
 
 ### Neplatný vstup – vrátí 400 s ValidationProblemDetails
@@ -38,7 +39,17 @@ Content-Type: application/json
 
 {
   "title": "",
-  "priority": "High"
+  "priority": "High",
+  "userId": "jan.novak"
+}
+
+### Neplatný userId – vrátí 400 a úkol nevznikne
+POST {{UAI.ZeroVP.API_HostAddress}}/api/todos
+Content-Type: application/json
+
+{
+  "title": "Úkol bez vlastníka",
+  "userId": "   "
 }
 
 ### Týdně se opakující úkol – vytvoří první výskyt a 3 další, vždy o týden později
@@ -49,6 +60,7 @@ Content-Type: application/json
   "title": "Týdenní report",
   "description": "Shrnout, co se za týden udělalo.",
   "priority": "Normal",
+  "userId": "jan.novak",
   "firstDueAtUtc": "2026-10-26T09:00:00Z",
   "repeatCount": 3
 }
@@ -59,6 +71,7 @@ Content-Type: application/json
 
 {
   "title": "Týdenní report",
+  "userId": "jan.novak",
   "firstDueAtUtc": "2026-10-26T09:00:00Z",
   "repeatCount": 53
 }

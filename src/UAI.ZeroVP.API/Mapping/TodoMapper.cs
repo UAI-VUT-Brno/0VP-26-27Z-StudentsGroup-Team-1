@@ -20,7 +20,8 @@ public static class TodoMapper
         IsCompleted = entity.IsCompleted,
         DueAtUtc = entity.DueAtUtc,
         CreatedAtUtc = entity.CreatedAtUtc,
-        CompletedAtUtc = entity.CompletedAtUtc
+        CompletedAtUtc = entity.CompletedAtUtc,
+        UserId = entity.UserId
     };
 
     /// <summary>Vytvoří novou entitu z požadavku na založení úkolu.</summary>
@@ -36,12 +37,13 @@ public static class TodoMapper
         DueAtUtc = null,
         CreatedAtUtc = nowUtc,
         CompletedAtUtc = null,
+        UserId = request.UserId.Trim(),
         UpdatedAtUtc = nowUtc
     };
 
     /// <summary>
     /// Vytvoří entitu pro každý výskyt týdně se opakujícího úkolu.
-    /// Výskyty sdílejí název, popis a prioritu, ale každý má vlastní <c>Id</c> a termín.
+    /// Výskyty sdílejí název, popis, prioritu a vlastníka, ale každý má vlastní <c>Id</c> a termín.
     /// </summary>
     /// <param name="request">Data z těla požadavku (už zvalidovaná).</param>
     /// <param name="nowUtc">Aktuální čas – předává se zvenčí kvůli testovatelnosti.</param>
@@ -54,7 +56,8 @@ public static class TodoMapper
         {
             Title = request.Title,
             Description = request.Description,
-            Priority = request.Priority
+            Priority = request.Priority,
+            UserId = request.UserId
         };
 
         return WeeklySchedule.GetDueDates(firstDueAtUtc, request.RepeatCount)
@@ -70,6 +73,7 @@ public static class TodoMapper
     /// <summary>
     /// Promítne data z požadavku do existující entity.
     /// Hlídá i přechod stavu dokončení, aby <c>CompletedAtUtc</c> odpovídal příznaku.
+    /// Vlastníka (<c>UserId</c>) nemění – určuje se jen při vytvoření úkolu.
     /// </summary>
     public static void ApplyTo(this UpdateTodoItemRequest request, TodoItem entity, DateTimeOffset nowUtc)
     {

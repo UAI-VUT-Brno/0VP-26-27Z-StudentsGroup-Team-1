@@ -63,6 +63,10 @@ public sealed class TodosController : ControllerBase
     }
 
     /// <summary>Založí nový úkol.</summary>
+    /// <remarks>
+    /// Pole <c>userId</c> je povinné: 1–100 znaků, okolní mezery se ořežou.
+    /// Jde jen o identifikátor vlastníka, API ho zatím nijak neověřuje.
+    /// </remarks>
     /// <param name="cancellationToken">Token pro zrušení operace.</param>
     /// <param name="request">Údaje nového úkolu.</param>
     /// <response code="201">Úkol byl vytvořen; hlavička <c>Location</c> odkazuje na nový zdroj.</response>
@@ -88,6 +92,7 @@ public sealed class TodosController : ControllerBase
     /// <remarks>
     /// Vznikne první výskyt a <c>repeatCount</c> dalších, každý o sedm dní později.
     /// Výskyty jsou samostatné úkoly: dokončení nebo smazání jednoho se ostatních nedotkne.
+    /// Každý výskyt dostane stejný <c>userId</c> (povinný, stejná pravidla jako u <c>POST /api/todos</c>).
     /// Při chybě ve vstupu se nevytvoří žádný.
     /// </remarks>
     /// <param name="cancellationToken">Token pro zrušení operace.</param>
@@ -121,6 +126,7 @@ public sealed class TodosController : ControllerBase
     /// <remarks>
     /// Jde o úplnou aktualizaci: hodnota, která v těle chybí, se nastaví na výchozí
     /// (<c>description</c> na <c>null</c>, <c>priority</c> na <c>Normal</c>, <c>isCompleted</c> na <c>false</c>).
+    /// Vlastník (<c>userId</c>) se určuje jen při vytvoření a změnit nejde; <c>userId</c> v těle se ignoruje.
     /// </remarks>
     /// <param name="id">Identifikátor úkolu.</param>
     /// <param name="cancellationToken">Token pro zrušení operace.</param>

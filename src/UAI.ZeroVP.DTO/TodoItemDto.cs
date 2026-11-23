@@ -25,7 +25,7 @@ public sealed record TodoItemDto
 
     /// <summary>Příznak, zda je úkol hotový.</summary>
     public required bool IsCompleted { get; init; }
-    
+
     /// <summary>Termín splnění (UTC), nebo <c>null</c> pokud úkol termín nemá.</summary>
     public required DateTimeOffset? DueAtUtc { get; init; }
     /// <summary>Okamžik vytvoření (UTC).</summary>
@@ -33,4 +33,10 @@ public sealed record TodoItemDto
 
     /// <summary>Okamžik dokončení (UTC), nebo <c>null</c> pokud úkol hotový není.</summary>
     public required DateTimeOffset? CompletedAtUtc { get; init; }
+
+    /// <summary>
+    /// Identifikátor uživatele, kterému úkol patří, nebo <c>null</c> u úkolů uložených
+    /// dřív, než vlastník existoval.
+    /// </summary>
+    public required string? UserId { get; init; }
 }
