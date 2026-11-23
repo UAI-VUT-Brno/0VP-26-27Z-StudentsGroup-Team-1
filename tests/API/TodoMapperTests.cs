@@ -24,7 +24,8 @@ public sealed class TodoMapperTests
         DueAtUtc = CreatedAt.AddDays(7),
         CreatedAtUtc = CreatedAt,
         CompletedAtUtc = isCompleted ? CreatedAt.AddHours(1) : null,
-        UpdatedAtUtc = CreatedAt.AddHours(1)
+        UpdatedAtUtc = CreatedAt.AddHours(1),
+        Version = 7
     };
 
     // --- ToDto --------------------------------------------------------------
@@ -70,6 +71,15 @@ public sealed class TodoMapperTests
         Assert.Null(typeof(TodoItemDto).GetProperty(nameof(TodoItem.UpdatedAtUtc)));
     }
 
+    // AC 1: Odpověď API nese verzi úkolu.
+    [Fact]
+    public void ToDto_CopiesVersion()
+    {
+        var entity = CreateEntity();
+
+        Assert.Equal(7, entity.ToDto().Version);
+    }
+
     // --- ToEntity -----------------------------------------------------------
 
     [Fact]
@@ -95,7 +105,16 @@ public sealed class TodoMapperTests
 
         Assert.Null(request.ToEntity(Now).DueAtUtc);
     }
-    
+
+    // AC 5: Nový úkol začíná ve verzi 1.
+    [Fact]
+    public void ToEntity_NewItemStartsAtVersionOne()
+    {
+        var request = new CreateTodoItemRequest { UserId = "jan.novak", Title = "Úkol" };
+
+        Assert.Equal(1, request.ToEntity(Now).Version);
+    }
+
     [Fact]
     public void ToEntity_EachCallGeneratesDifferentId()
     {
@@ -277,6 +296,17 @@ public sealed class TodoMapperTests
 
         Assert.True(entity.IsCompleted);
         Assert.Equal(Now, entity.CompletedAtUtc);
+    }
+
+    // AC 2: Verzi mění jen repozitář při zápisu – verze od klienta se do entity nepromítne.
+    [Fact]
+    public void ApplyTo_DoesNotChangeVersion()
+    {
+        var entity = CreateEntity();
+
+        new UpdateTodoItemRequest { Title = "Úkol", Version = 3 }.ApplyTo(entity, Now);
+
+        Assert.Equal(7, entity.Version);
     }
 
     // --- SetCompletionState -------------------------------------------------

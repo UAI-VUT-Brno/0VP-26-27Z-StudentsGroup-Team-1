@@ -1,3 +1,4 @@
+﻿using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
@@ -152,8 +153,145 @@ public sealed class PersistentApiIntegrationTests : IDisposable
             aliceOpenIds);
     }
 
+    // AC 4, AC 2, AC 3: Úspěšný zápis přes jednu instanci zneplatní verzi, kterou drží druhá.
+    [Fact]
+    public async Task TwoHostsUsingSameFile_UpdateThroughOne_MakesVersionStaleOnOther()
+    {
+        await using var firstFactory = CreateFactory("api-a");
+        await using var secondFactory = CreateFactory("api-b");
+
+        using var firstClient = firstFactory.CreateClient();
+        using var secondClient = secondFactory.CreateClient();
+
+        var id = await CreateTodoAsync(
+            firstClient,
+            userId: "alice",
+            title: "Shared task");
+
+        using (var readByB = await GetTodoAsync(secondClient, id))
+        {
+            Assert.Equal(1, readByB.RootElement.GetProperty("version").GetInt64());
+        }
+
+        using (var updatedByA = await PutTodoAsync(firstClient, id, "Changed by A", version: 1))
+        {
+            Assert.Equal(HttpStatusCode.OK, updatedByA.StatusCode);
+            using var json = await ReadJsonAsync(updatedByA);
+            Assert.Equal(2, json.RootElement.GetProperty("version").GetInt64());
+        }
+
+        using (var staleFromB = await PutTodoAsync(secondClient, id, "Changed by B", version: 1))
+        {
+            Assert.Equal(HttpStatusCode.Conflict, staleFromB.StatusCode);
+            Assert.Equal(
+                "application/problem+json",
+                staleFromB.Content.Headers.ContentType?.MediaType);
+
+            using var problem = await ReadJsonAsync(staleFromB);
+            Assert.Contains(
+                "aktuální verzi 2,",
+                problem.RootElement.GetProperty("detail").GetString());
+        }
+
+        using (var current = await GetTodoAsync(secondClient, id))
+        {
+            Assert.Equal("Changed by A", current.RootElement.GetProperty("title").GetString());
+            Assert.Equal(2, current.RootElement.GetProperty("version").GetInt64());
+        }
+
+        using var retriedByB = await PutTodoAsync(secondClient, id, "Changed by B", version: 2);
+
+        Assert.Equal(HttpStatusCode.OK, retriedByB.StatusCode);
+        using var retried = await ReadJsonAsync(retriedByB);
+        Assert.Equal("Changed by B", retried.RootElement.GetProperty("title").GetString());
+        Assert.Equal(3, retried.RootElement.GetProperty("version").GetInt64());
+    }
+
+    // AC 3, AC 4: Smazání se zastaralou verzí přes druhou instanci vrátí 409 a úkol v souboru zůstane.
+    [Fact]
+    public async Task TwoHostsUsingSameFile_DeleteWithStaleVersion_Returns409AndKeepsTask()
+    {
+        await using var firstFactory = CreateFactory("api-a");
+        await using var secondFactory = CreateFactory("api-b");
+
+        using var firstClient = firstFactory.CreateClient();
+        using var secondClient = secondFactory.CreateClient();
+
+        var id = await CreateTodoAsync(
+            firstClient,
+            userId: "alice",
+            title: "Shared task");
+
+        using (var completedByA = await firstClient.PostAsync($"/api/todos/{id}/complete", null))
+        {
+            Assert.Equal(HttpStatusCode.OK, completedByA.StatusCode);
+        }
+
+        using (var staleFromB = await secondClient.DeleteAsync($"/api/todos/{id}?version=1"))
+        {
+            Assert.Equal(HttpStatusCode.Conflict, staleFromB.StatusCode);
+        }
+
+        using var current = await GetTodoAsync(firstClient, id);
+        Assert.True(current.RootElement.GetProperty("isCompleted").GetBoolean());
+        Assert.Equal(2, current.RootElement.GetProperty("version").GetInt64());
+    }
+
+    // AC 1, AC 5: Soubor uložený před zavedením verzí se načte s verzí 1 a jde dál upravovat.
+    [Fact]
+    public async Task FileFromBeforeVersions_LoadsWithVersionOneAndAcceptsUpdate()
+    {
+        var id = Guid.Parse("0f8fad5b-d9cb-469f-a165-70867728950e");
+        Directory.CreateDirectory(_directory);
+        await File.WriteAllTextAsync(
+            StorageFilePath,
+            """[{"id": "0f8fad5b-d9cb-469f-a165-70867728950e", "userId": "alice", "title": "Old task", "createdAtUtc": "2026-10-26T12:00:00Z"}]""");
+
+        await using var factory = CreateFactory("api-old-file");
+        using var client = factory.CreateClient();
+
+        using (var loaded = await GetTodoAsync(client, id))
+        {
+            Assert.Equal(1, loaded.RootElement.GetProperty("version").GetInt64());
+        }
+
+        using var updated = await PutTodoAsync(client, id, "Old task updated", version: 1);
+
+        Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
+        using var json = await ReadJsonAsync(updated);
+        Assert.Equal(2, json.RootElement.GetProperty("version").GetInt64());
+        Assert.Contains("\"version\": 2", await File.ReadAllTextAsync(StorageFilePath));
+    }
+
     private PersistentApiTestFactory CreateFactory(string instanceName) =>
         new(StorageFilePath, instanceName);
+
+    private static Task<HttpResponseMessage> PutTodoAsync(
+        HttpClient client,
+        Guid id,
+        string title,
+        long version) =>
+        client.PutAsJsonAsync(
+            $"/api/todos/{id}",
+            new
+            {
+                Title = title,
+                Version = version,
+            });
+
+    private static async Task<JsonDocument> GetTodoAsync(
+        HttpClient client,
+        Guid id)
+    {
+        using var response = await client.GetAsync($"/api/todos/{id}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        return await ReadJsonAsync(response);
+    }
+
+    private static async Task<JsonDocument> ReadJsonAsync(HttpResponseMessage response) =>
+        JsonDocument.Parse(await response.Content.ReadAsStringAsync());
 
     private static async Task<Guid> CreateTodoAsync(
         HttpClient client,

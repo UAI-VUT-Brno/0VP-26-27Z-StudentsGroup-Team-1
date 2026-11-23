@@ -64,6 +64,17 @@ public sealed class TodosControllerTests
         Assert.Contains(id.ToString(), problem.Detail);
     }
 
+    /// <summary>Ověří odpověď 409 ve formátu ProblemDetails, která uvádí aktuální verzi úkolu.</summary>
+    private static void AssertConflictProblem(IActionResult? result, long currentVersion)
+    {
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status409Conflict, objectResult.StatusCode);
+
+        var problem = Assert.IsType<ProblemDetails>(objectResult.Value);
+        Assert.Equal(StatusCodes.Status409Conflict, problem.Status);
+        Assert.Contains($"aktuální verzi {currentVersion},", problem.Detail);
+    }
+
     // --- GET /api/todos -----------------------------------------------------
 
     [Fact]
@@ -178,6 +189,16 @@ public sealed class TodosControllerTests
 
         var dto = Assert.IsType<TodoItemDto>(Assert.IsType<CreatedAtRouteResult>(result.Result).Value);
         Assert.Null(dto.DueAtUtc);
+    }
+
+    // AC 1, AC 5: Nový úkol se vrací s verzí 1.
+    [Fact]
+    public async Task Create_ReturnsItemWithVersionOne()
+    {
+        var result = await CreateController().Create(new CreateTodoItemRequest { Title = "Úkol" }, CancellationToken.None);
+
+        var dto = Assert.IsType<TodoItemDto>(Assert.IsType<CreatedAtRouteResult>(result.Result).Value);
+        Assert.Equal(1, dto.Version);
     }
 
     [Fact]
@@ -337,6 +358,39 @@ public sealed class TodosControllerTests
         AssertNotFoundProblem(result.Result, item.Id);
     }
 
+    // AC 2: Shodná verze úkol aktualizuje a odpověď nese verzi o 1 vyšší.
+    [Fact]
+    public async Task Update_MatchingVersion_ReturnsOkWithIncrementedVersion()
+    {
+        var item = await AddItemAsync("Původní");
+        var request = new UpdateTodoItemRequest { Title = "Nový název", Version = item.Version };
+
+        var dto = AssertOk(await CreateController().Update(item.Id, request, CancellationToken.None));
+
+        Assert.Equal(item.Version + 1, dto.Version);
+        Assert.Equal("Nový název", dto.Title);
+        var stored = await _repository.GetByIdAsync(item.Id);
+        Assert.NotNull(stored);
+        Assert.Equal(dto.Version, stored.Version);
+    }
+
+    // AC 3: Zastaralá verze vrátí 409 ProblemDetails a uložený úkol se nezmění.
+    [Fact]
+    public async Task Update_StaleVersion_ReturnsConflictProblemAndKeepsStoredItem()
+    {
+        var item = await AddItemAsync("Původní");
+        var controller = CreateController();
+        AssertOk(await controller.Update(item.Id, new UpdateTodoItemRequest { Title = "Novější", Version = 1 }, CancellationToken.None));
+
+        var result = await controller.Update(item.Id, new UpdateTodoItemRequest { Title = "Zastaralý", Version = 1 }, CancellationToken.None);
+
+        AssertConflictProblem(result.Result, currentVersion: 2);
+        var stored = await _repository.GetByIdAsync(item.Id);
+        Assert.NotNull(stored);
+        Assert.Equal("Novější", stored.Title);
+        Assert.Equal(2, stored.Version);
+    }
+
     // --- POST /api/todos/{id}/complete --------------------------------------
 
     [Fact]
@@ -382,6 +436,40 @@ public sealed class TodosControllerTests
         AssertNotFoundProblem(result.Result, item.Id);
     }
 
+    // AC 9: Dokončení zvýší verzi a odpověď ji obsahuje.
+    [Fact]
+    public async Task Complete_OpenItem_ReturnsIncrementedVersion()
+    {
+        var item = await AddItemAsync(isCompleted: false);
+
+        var dto = AssertOk(await CreateController().Complete(item.Id, CancellationToken.None));
+
+        Assert.Equal(item.Version + 1, dto.Version);
+        var stored = await _repository.GetByIdAsync(item.Id);
+        Assert.NotNull(stored);
+        Assert.Equal(dto.Version, stored.Version);
+    }
+
+    // AC 9: Dokončení nepřepíše souběžnou změnu – dokončí nejnovější stav a vrátí další verzi.
+    [Fact]
+    public async Task Complete_ItemChangedMeanwhile_CompletesLatestStateWithNextVersion()
+    {
+        var item = await AddItemAsync("Původní", isCompleted: false);
+        var controller = CreateController(new ChangedBeforeFirstUpdateRepository(_repository, "Změněno souběžně"));
+
+        var dto = AssertOk(await controller.Complete(item.Id, CancellationToken.None));
+
+        // Verze 2 je souběžná změna názvu, verze 3 dokončení nad ní.
+        Assert.True(dto.IsCompleted);
+        Assert.Equal("Změněno souběžně", dto.Title);
+        Assert.Equal(3, dto.Version);
+        var stored = await _repository.GetByIdAsync(item.Id);
+        Assert.NotNull(stored);
+        Assert.True(stored.IsCompleted);
+        Assert.Equal("Změněno souběžně", stored.Title);
+        Assert.Equal(3, stored.Version);
+    }
+
     // --- DELETE /api/todos/{id} ---------------------------------------------
 
     [Fact]
@@ -403,6 +491,20 @@ public sealed class TodosControllerTests
         var result = await CreateController().Delete(id, version: 1, CancellationToken.None);
 
         AssertNotFoundProblem(result, id);
+    }
+
+    // AC 3: Smazání se zastaralou verzí vrátí 409 ProblemDetails a úkol zůstane.
+    [Fact]
+    public async Task Delete_StaleVersion_ReturnsConflictProblemAndKeepsItem()
+    {
+        var item = await AddItemAsync();
+        var controller = CreateController();
+        AssertOk(await controller.Complete(item.Id, CancellationToken.None));
+
+        var result = await controller.Delete(item.Id, version: 1, CancellationToken.None);
+
+        AssertConflictProblem(result, currentVersion: 2);
+        Assert.NotNull(await _repository.GetByIdAsync(item.Id));
     }
 
     /// <summary>
@@ -433,6 +535,53 @@ public sealed class TodosControllerTests
         public async Task<TodoWriteResult> UpdateIfVersionMatchesAsync(TodoItem item, long expectedVersion, CancellationToken cancellationToken = default)
         {
             await inner.DeleteAsync(item.Id, cancellationToken);
+            return await inner.UpdateIfVersionMatchesAsync(item, expectedVersion, cancellationToken);
+        }
+
+        public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default) =>
+            inner.DeleteAsync(id, cancellationToken);
+
+        public Task<TodoWriteResult> DeleteIfVersionMatchesAsync(Guid id, long expectedVersion, CancellationToken cancellationToken = default) =>
+            inner.DeleteIfVersionMatchesAsync(id, expectedVersion, cancellationToken);
+
+        public Task<int> CountAsync(CancellationToken cancellationToken = default) =>
+            inner.CountAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Napodobí souběh u dokončení: těsně před prvním podmíněným zápisem změní úkol jiný požadavek
+    /// (přepíše název, a tím zvýší verzi). Kontroler tak napoprvé dostane konflikt.
+    /// </summary>
+    private sealed class ChangedBeforeFirstUpdateRepository(ITodoRepository inner, string concurrentTitle) : ITodoRepository
+    {
+        private bool _changed;
+
+        public Task<IReadOnlyList<TodoItem>> GetAllAsync(string? userId = null, bool? isCompleted = null, CancellationToken cancellationToken = default) =>
+            inner.GetAllAsync(userId, isCompleted, cancellationToken);
+
+        public Task<TodoItem?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+            inner.GetByIdAsync(id, cancellationToken);
+
+        public Task<TodoItem> AddAsync(TodoItem item, CancellationToken cancellationToken = default) =>
+            inner.AddAsync(item, cancellationToken);
+
+        public Task<IReadOnlyList<TodoItem>> AddRangeAsync(IEnumerable<TodoItem> items, CancellationToken cancellationToken = default) =>
+            inner.AddRangeAsync(items, cancellationToken);
+
+        public Task<bool> UpdateAsync(TodoItem item, CancellationToken cancellationToken = default) =>
+            inner.UpdateAsync(item, cancellationToken);
+
+        public async Task<TodoWriteResult> UpdateIfVersionMatchesAsync(TodoItem item, long expectedVersion, CancellationToken cancellationToken = default)
+        {
+            if (!_changed)
+            {
+                _changed = true;
+                var current = await inner.GetByIdAsync(item.Id, cancellationToken);
+                Assert.NotNull(current);
+                current.Title = concurrentTitle;
+                await inner.UpdateAsync(current, cancellationToken);
+            }
+
             return await inner.UpdateIfVersionMatchesAsync(item, expectedVersion, cancellationToken);
         }
 
