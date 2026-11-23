@@ -71,12 +71,23 @@ The file uses the same conventions as the API: camelCase property names, the pri
     "dueAtUtc": null,
     "createdAtUtc": "2026-10-25T13:00:58.762722+00:00",
     "completedAtUtc": null,
-    "updatedAtUtc": "2026-10-25T13:00:58.762722+00:00"
+    "updatedAtUtc": "2026-10-25T13:00:58.762722+00:00",
+    "version": 1
   }
 ]
 ```
 
 `userId` was added later. A file saved before that has no `userId`; such tasks still load and have `userId: null`.
+
+`version` was added later too. A file saved before that has no `version`; such tasks load with version 1, and the next write adds `version` to the file. No migration is needed. Older builds can still read the new file, because the serializer ignores unknown properties.
+
+## Optimistic concurrency
+
+Every task has a `version`. New tasks start at 1, and every successful write raises it by exactly 1. `PUT` and `DELETE` carry the version the client last read. `UpdateIfVersionMatchesAsync` and `DeleteIfVersionMatchesAsync` compare it with the stored version and write in the same `ExecuteAsync` call, so the comparison and the write run inside one locked read–change–write cycle (see [Locking](#locking)). Another instance cannot write between the two steps. When the versions differ, the repository returns a conflict, the data stay as they are and the API answers `409 Conflict`.
+
+Like any other write operation, a version-checked write saves the file even when the result is a conflict or "not found". The file content is then unchanged.
+
+`POST /api/todos/{id}/complete` does not take a version from the client. It uses the version it has just read; if another write got in between, it reads the task again and completes the latest state, so it never overwrites a concurrent change.
 
 ## Tests
 
@@ -84,10 +95,11 @@ Tests never touch `src/UAI.ZeroVP.API/data/`. The API test factories set `Todo:S
 
 | Test class | What it covers |
 |---|---|
-| `JsonFileTodoStoreTests` | Save and load of all fields, missing file, corrupted file variants, backup of the corrupted file, atomic overwrite |
-| `JsonFileTodoRepositoryTests` | Two repositories over one file (= two instances): changes are visible through the other one, concurrent writes lose no task, sample data are created once, a failed write leaves the file unchanged, waiting for and timing out on the lock |
+| `JsonFileTodoStoreTests` | Save and load of all fields including `version`, a file from before versions loads with version 1, missing file, corrupted file variants, backup of the corrupted file, atomic overwrite |
+| `JsonFileTodoRepositoryTests` | Two repositories over one file (= two instances): changes are visible through the other one, concurrent writes lose no task, sample data are created once, a failed write leaves the file unchanged, waiting for and timing out on the lock; a version-checked write through one makes the version stale on the other, a stale delete keeps the task, of concurrent writes with the same version exactly one succeeds |
 | `JsonFileTodoDataTests` | DI registration; a change is in the file immediately; a host is stopped and a new host on the same file loads the tasks (restart), changes and deletions survive, a corrupted file at start |
-| `InMemoryTodoRepositoryTests` | The repository starts from given items instead of sample data |
+| `InMemoryTodoRepositoryTests` | The repository starts from given items instead of sample data; version-checked update and delete (matching version, stale version, unknown task), of 1000 concurrent updates with the same version exactly one succeeds |
+| `PersistentApiIntegrationTests` | API hosts over one file; a file from before versions loads with version 1 and accepts an update that writes `"version": 2` |
 
 ## Locking
 

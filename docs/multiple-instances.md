@@ -83,6 +83,28 @@ All instances use the file from `Todo:Storage:FilePath` – by default `src/UAI.
 
 To start from scratch, stop all instances and delete the `data` folder.
 
+## Concurrent changes to one task
+
+The lock stops instances from losing each other's writes to the file, but on its own it would not stop a client from overwriting a change it has not seen. Every task therefore has a `version`, and `PUT` and `DELETE` must send the version the client last read. A successful write through one instance raises the version in the shared file, so the older version becomes stale on **all** instances: a `PUT` or `DELETE` with it, sent to any instance, gets `409 Conflict` and changes nothing. The client reads the task again, from any instance, and retries with the new version.
+
+```bash
+# both instances return the task with "version": 1
+curl http://localhost:5001/api/todos/<id>
+curl http://localhost:5002/api/todos/<id>
+
+# an update through 5001 with version 1 succeeds and returns "version": 2
+curl -X PUT http://localhost:5001/api/todos/<id> \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Changed through 5001","version":1}'
+
+# the same version through 5002 is now stale: 409 Conflict, detail names version 2
+curl -i -X PUT http://localhost:5002/api/todos/<id> \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Changed through 5002","version":1}'
+```
+
+The version check and the write run under the same file lock, so of two instances writing with the same version at the same moment, exactly one succeeds. See [persistence.md](persistence.md#optimistic-concurrency).
+
 ## Shared log file
 
 All instances also write into the same log file, `src/UAI.ZeroVP.API/logs/uai-zerovp-<date>.log`. The file is opened in shared mode, so no instance locks the others out, and every line carries the instance name:
@@ -98,7 +120,8 @@ To get one file per instance instead, give each instance its own `PersistentLogg
 
 | Test class | What it covers |
 |---|---|
-| `JsonFileTodoRepositoryTests` | Two repositories over one file stand for two instances: changes are visible through the other one, concurrent writes lose no task, the lock is waited for |
+| `JsonFileTodoRepositoryTests` | Two repositories over one file stand for two instances: changes are visible through the other one, concurrent writes lose no task, the lock is waited for; a version-checked write through one makes the version stale on the other, and of concurrent writes with the same version from both, exactly one succeeds |
+| `PersistentApiIntegrationTests` | Two API hosts over one file: a task created through one is visible through the other; a successful `PUT` through one host makes the version stale on the other (`409` naming the new version, the other host then sees the first host's change and can update with the new version); a stale `DELETE` returns `409` and keeps the task |
 | `InstanceIdentityTests` | The name from configuration and its default; two API hosts return different names in `GET /api/info`; the `X-Instance-Id` header on `200`, `404` and `/health` |
 | `OpenApiDocumentTests` | `X-Instance-Id` is documented as a required header of every response, and real responses send it |
 
