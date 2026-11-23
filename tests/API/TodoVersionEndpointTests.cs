@@ -10,6 +10,12 @@ namespace UAI.ZeroVP.Tests.API;
 /// </summary>
 public sealed class TodoVersionEndpointTests : IClassFixture<ApiTestFactory>
 {
+    /// <summary>
+    /// Chyby z kontroleru (400, 404, 409) mají kvůli <c>[Produces("application/json")]</c> typ obsahu
+    /// <c>application/json</c>; <c>application/problem+json</c> posílá jen obsluha výjimek (500). Viz docs/openapi.md.
+    /// </summary>
+    private const string ControllerProblemMediaType = "application/json";
+
     private readonly HttpClient _client;
 
     public TodoVersionEndpointTests(ApiTestFactory factory) => _client = factory.CreateClient();
@@ -105,7 +111,7 @@ public sealed class TodoVersionEndpointTests : IClassFixture<ApiTestFactory>
         using var response = await PutAsync($"/api/todos/{Guid.NewGuid()}", "Úkol", version: 1);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(ControllerProblemMediaType, response.Content.Headers.ContentType?.MediaType);
     }
 
     // AC 2: DELETE se shodnou verzí vrátí 204 a úkol zmizí.
@@ -160,7 +166,7 @@ public sealed class TodoVersionEndpointTests : IClassFixture<ApiTestFactory>
         using var response = await _client.DeleteAsync($"/api/todos/{Guid.NewGuid()}?version=1");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(ControllerProblemMediaType, response.Content.Headers.ContentType?.MediaType);
     }
 
     // AC 9: POST /complete zvýší verzi a odpověď ji obsahuje.
@@ -222,7 +228,7 @@ public sealed class TodoVersionEndpointTests : IClassFixture<ApiTestFactory>
     private static async Task AssertConflictProblemAsync(HttpResponseMessage response, long currentVersion)
     {
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(ControllerProblemMediaType, response.Content.Headers.ContentType?.MediaType);
 
         using var json = await ReadJsonAsync(response);
         Assert.Equal(409, json.RootElement.GetProperty("status").GetInt32());
@@ -233,7 +239,7 @@ public sealed class TodoVersionEndpointTests : IClassFixture<ApiTestFactory>
     private static async Task AssertValidationProblemAsync(HttpResponseMessage response, string errorKey)
     {
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(ControllerProblemMediaType, response.Content.Headers.ContentType?.MediaType);
 
         using var json = await ReadJsonAsync(response);
         Assert.True(json.RootElement.GetProperty("errors").TryGetProperty(errorKey, out _), json.RootElement.ToString());

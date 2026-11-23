@@ -183,8 +183,9 @@ public sealed class PersistentApiIntegrationTests : IDisposable
         using (var staleFromB = await PutTodoAsync(secondClient, id, "Changed by B", version: 1))
         {
             Assert.Equal(HttpStatusCode.Conflict, staleFromB.StatusCode);
+            // Chyby z kontroleru mají kvůli [Produces("application/json")] typ application/json (viz docs/openapi.md).
             Assert.Equal(
-                "application/problem+json",
+                "application/json",
                 staleFromB.Content.Headers.ContentType?.MediaType);
 
             using var problem = await ReadJsonAsync(staleFromB);
