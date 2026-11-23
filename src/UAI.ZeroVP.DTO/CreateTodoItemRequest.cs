@@ -29,4 +29,16 @@ public sealed record CreateTodoItemRequest
     [DefaultValue(TodoPriority.Normal)]
     [EnumDataType(typeof(TodoPriority), ErrorMessage = "Neplatná hodnota priority.")]
     public TodoPriority Priority { get; init; } = TodoPriority.Normal;
+
+    private string _userId = string.Empty;
+
+    /// <summary>Owner identifier. Required, trimmed, 1–100 characters.</summary>
+    /// <example>honza</example>
+    [Required(AllowEmptyStrings = false, ErrorMessage = "Identifikátor uživatele je povinný.")]
+    [StringLength(100, MinimumLength = 1, ErrorMessage = "Identifikátor uživatele musí mít 1 až 100 znaků.")]
+    public string UserId
+    {
+        get => _userId;
+        init => _userId = (value ?? string.Empty).Trim();
+    }
 }

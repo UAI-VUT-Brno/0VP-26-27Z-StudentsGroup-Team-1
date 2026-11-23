@@ -203,4 +203,15 @@ public sealed class JsonFileTodoStoreTests : IDisposable
         Assert.Single(store.Load()!);
         Assert.Contains(backupPath, _logger.Collector.GetSnapshot().Single(r => r.Level == LogLevel.Error).Message);
     }
+
+    [Fact]
+    public void Load_LegacyFileWithoutUserId_LoadsNullOwner()
+    {
+        WriteFile(
+            """[{"id":"0f8fad5b-d9cb-469f-a165-70867728950e","title":"Starý úkol","createdAtUtc":"2026-10-26T12:00:00Z"}]""");
+
+        var item = Assert.Single(CreateStore().Load()!);
+
+        Assert.Null(item.UserId);
+    }
 }

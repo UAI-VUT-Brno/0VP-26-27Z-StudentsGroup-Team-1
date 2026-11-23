@@ -33,4 +33,7 @@ public sealed record TodoItemDto
 
     /// <summary>Okamžik dokončení (UTC), nebo <c>null</c> pokud úkol hotový není.</summary>
     public required DateTimeOffset? CompletedAtUtc { get; init; }
+
+    /// <summary>Owner identifier; null for tasks loaded from older files.</summary>
+    public required string? UserId { get; init; }
 }

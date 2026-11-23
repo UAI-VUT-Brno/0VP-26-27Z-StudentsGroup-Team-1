@@ -1,5 +1,4 @@
-﻿
-using UAI.ZeroVP.DTO;
+﻿using UAI.ZeroVP.DTO;
 using UAI.ZeroVP.API.Scheduling;
 using UAI.ZeroVP.Data.Entities;
 namespace UAI.ZeroVP.API.Mapping;
@@ -20,7 +19,8 @@ public static class TodoMapper
         IsCompleted = entity.IsCompleted,
         DueAtUtc = entity.DueAtUtc,
         CreatedAtUtc = entity.CreatedAtUtc,
-        CompletedAtUtc = entity.CompletedAtUtc
+        CompletedAtUtc = entity.CompletedAtUtc,
+        UserId = entity.UserId
     };
 
     /// <summary>Vytvoří novou entitu z požadavku na založení úkolu.</summary>
@@ -36,7 +36,8 @@ public static class TodoMapper
         DueAtUtc = null,
         CreatedAtUtc = nowUtc,
         CompletedAtUtc = null,
-        UpdatedAtUtc = nowUtc
+        UpdatedAtUtc = nowUtc,
+        UserId = request.UserId
     };
 
     /// <summary>
@@ -54,7 +55,8 @@ public static class TodoMapper
         {
             Title = request.Title,
             Description = request.Description,
-            Priority = request.Priority
+            Priority = request.Priority,
+            UserId = request.UserId
         };
 
         return WeeklySchedule.GetDueDates(firstDueAtUtc, request.RepeatCount)

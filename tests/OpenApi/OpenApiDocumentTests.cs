@@ -26,7 +26,11 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
     private const string MissingId = "00000000-0000-0000-0000-000000000001";
     
     /// <summary>Platné tělo požadavku <c>POST /api/todos/repeat</c>.</summary>
-    private const string RepeatBody = "{\"title\":\"Týdenní report\",\"firstDueAtUtc\":\"2026-10-26T09:00:00Z\",\"repeatCount\":3}";
+    private const string RepeatBody =
+    "{\"title\":\"Týdenní report\",\"userId\":\"honza\",\"firstDueAtUtc\":\"2026-10-26T09:00:00Z\",\"repeatCount\":3}";
+
+    const string createBody = "{\"title\":\"Napsat Dockerfile\",\"userId\":\"honza\",\"priority\":\"High\"}";
+    const string updateBody = "{\"title\":\"Napsat Dockerfile\",\"priority\":\"High\"}";
 
     private readonly OpenApiTestFactory _factory;
     private readonly HttpClient _client;
@@ -236,9 +240,8 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
     public async Task SuccessfulTodoLifecycle_MatchesDocument()
     {
         var document = await LoadDocumentAsync();
-        const string body = "{\"title\":\"Napsat Dockerfile\",\"priority\":\"High\"}";
 
-        using var created = await SendAsync(_client, "POST", "/api/todos", body, "application/json");
+        using var created = await SendAsync(_client, "POST", "/api/todos", createBody, "application/json");
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         await AssertDocumentedAsync(document, "POST", "/api/todos", created);
         var url = created.Headers.Location!.AbsolutePath;
@@ -247,7 +250,7 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
         Assert.Equal(HttpStatusCode.OK, detail.StatusCode);
         await AssertDocumentedAsync(document, "GET", "/api/todos/{id}", detail);
 
-        using var updated = await SendAsync(_client, "PUT", url, body, "application/json");
+        using var updated = await SendAsync(_client, "PUT", url, updateBody, "application/json");
         Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
         await AssertDocumentedAsync(document, "PUT", "/api/todos/{id}", updated);
 

@@ -22,7 +22,8 @@ public sealed class TodoItemTests
         DueAtUtc = CreatedAt.AddDays(7),
         CreatedAtUtc = CreatedAt,
         CompletedAtUtc = CreatedAt.AddHours(2),
-        UpdatedAtUtc = CreatedAt.AddHours(3)
+        UpdatedAtUtc = CreatedAt.AddHours(3),
+        UserId = "honza",
     };
 
     [Fact]
@@ -41,6 +42,7 @@ public sealed class TodoItemTests
         Assert.Equal(original.CreatedAtUtc, clone.CreatedAtUtc);
         Assert.Equal(original.CompletedAtUtc, clone.CompletedAtUtc);
         Assert.Equal(original.UpdatedAtUtc, clone.UpdatedAtUtc);
+        Assert.Equal(original.UserId, clone.UserId);
     }
 
     [Fact]

@@ -36,6 +36,9 @@ public sealed class TodoItem
     /// <summary>Interní audit – poslední změna záznamu. Do DTO se nepromítá.</summary>
     public DateTimeOffset UpdatedAtUtc { get; set; }
 
+    /// <summary>Owner identifier; null for tasks loaded from older files.</summary>
+    public string? UserId { get; set; }
+
     /// <summary>
     /// Vytvoří hlubokou kopii entity. In-memory repozitář ji používá proto,
     /// aby volající nemohl omylem změnit uložený stav mimo repozitář
@@ -51,6 +54,7 @@ public sealed class TodoItem
         DueAtUtc = DueAtUtc,
         CreatedAtUtc = CreatedAtUtc,
         CompletedAtUtc = CompletedAtUtc,
-        UpdatedAtUtc = UpdatedAtUtc
+        UpdatedAtUtc = UpdatedAtUtc,
+        UserId = UserId,
     };
 }

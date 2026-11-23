@@ -9,7 +9,11 @@ public sealed class CreateTodoItemRequestTests
     [Fact]
     public void Validate_TitleOnly_IsValid()
     {
-        var request = new CreateTodoItemRequest { Title = "Napsat Dockerfile" };
+        var request = new CreateTodoItemRequest
+        {
+            Title = "Napsat Dockerfile",
+            UserId = "honza"
+        };
 
         Assert.Empty(Validate(request));
     }

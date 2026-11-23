@@ -13,9 +13,8 @@ public sealed class CreateRepeatingTodoItemRequestTests
 
     private static CreateRepeatingTodoItemRequest CreateValidRequest() => new()
     {
-        Title = "Týdenní report",
-        FirstDueAtUtc = FirstDue,
-        RepeatCount = 3
+        Title = "Úkol",
+        UserId = "honza"
     };
 
     [Fact]
@@ -31,6 +30,43 @@ public sealed class CreateRepeatingTodoItemRequestTests
     }
 
     // --- Pole úkolu (stejná pravidla jako POST /api/todos) ------------------
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("x" + "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")]
+    public void Validate_InvalidUserId_FailsOnUserId(string? userId)
+    {
+        var request = CreateValidRequest() with { UserId = userId! };
+
+        AssertSingleErrorFor(request, nameof(CreateTodoItemRequest.UserId));
+    }
+
+    [Fact]
+    public void Validate_UserId_Over100Characters_FailsOnUserId()
+    {
+        var request = CreateValidRequest() with { UserId = new string('x', 101) };
+
+        AssertSingleErrorFor(request, nameof(CreateTodoItemRequest.UserId));
+    }
+
+    [Fact]
+    public void Validate_UserId_At100Characters_IsValid()
+    {
+        var request = CreateValidRequest() with { UserId = new string('x', 100) };
+
+        Assert.Empty(Validate(request));
+    }
+
+    [Fact]
+    public void Validate_UserId_IsTrimmed()
+    {
+        var request = CreateValidRequest() with { UserId = "  honza  " };
+
+        Assert.Equal("honza", request.UserId);
+        Assert.Empty(Validate(request));
+    }
 
     [Theory]
     [InlineData(null)]

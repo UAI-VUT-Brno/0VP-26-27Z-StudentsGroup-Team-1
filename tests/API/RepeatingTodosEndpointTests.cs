@@ -12,7 +12,7 @@ namespace UAI.ZeroVP.Tests.API;
 public sealed class RepeatingTodosEndpointTests : IClassFixture<ApiTestFactory>
 {
     private const string ValidBody =
-        """{"title":"Týdenní report","priority":"High","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""";
+        """{"title":"Týdenní report","userId":"honza","priority":"High","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""";
 
     private readonly HttpClient _client;
 
@@ -36,6 +36,7 @@ public sealed class RepeatingTodosEndpointTests : IClassFixture<ApiTestFactory>
             Assert.Equal("Týdenní report", occurrence.GetProperty("title").GetString());
             Assert.Equal("High", occurrence.GetProperty("priority").GetString());
             Assert.False(occurrence.GetProperty("isCompleted").GetBoolean());
+            Assert.Equal("honza", occurrence.GetProperty("userId").GetString());
         });
     }
 
@@ -77,7 +78,9 @@ public sealed class RepeatingTodosEndpointTests : IClassFixture<ApiTestFactory>
         { """{"title":"Úkol","firstDueAtUtc":"2026-10-26T09:00:00Z"}""",                        "RepeatCount" },
         { """{"title":"Úkol","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":0}""",        "RepeatCount" },
         { """{"title":"Úkol","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":53}""",       "RepeatCount" },
-        { """{"title":"Úkol","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":"3"}""",      "$.repeatCount" }
+        { """{"title":"Úkol","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":"3"}""",      "$.repeatCount" },
+        { """{"title":"Úkol","userId":null,"firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""", "UserId" },
+        { """{"title":"Úkol","userId":"   ","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""", "UserId" },
     };
 
     [Theory]
@@ -101,7 +104,7 @@ public sealed class RepeatingTodosEndpointTests : IClassFixture<ApiTestFactory>
     public async Task PostTodo_WithoutDueDate_ReturnsDueAtUtcNull()
     {
         // Běžné založení úkolu zůstává kompatibilní; nové pole se posílá vždy, i s null.
-        using var response = await PostJsonAsync("/api/todos", """{"title":"Úkol"}""");
+        using var response = await PostJsonAsync("/api/todos", """{"title":"Úkol","userId":"honza"}""");
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         using var json = await ReadJsonAsync(response);

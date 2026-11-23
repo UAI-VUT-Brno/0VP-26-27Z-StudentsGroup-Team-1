@@ -62,6 +62,18 @@ public sealed record CreateRepeatingTodoItemRequest : IValidatableObject
     [Range(MinRepeatCount, MaxRepeatCount, ErrorMessage = "Počet opakování musí být 1 až 52.")]
     public int RepeatCount { get; init; }
 
+    private string _userId = string.Empty;
+
+    /// <summary>Owner identifier. Required, trimmed, 1–100 characters.</summary>
+    /// <example>honza</example>
+    [Required(AllowEmptyStrings = false, ErrorMessage = "Identifikátor uživatele je povinný.")]
+    [StringLength(100, MinimumLength = 1, ErrorMessage = "Identifikátor uživatele musí mít 1 až 100 znaků.")]
+    public string UserId
+    {
+        get => _userId;
+        init => _userId = (value ?? string.Empty).Trim();
+    }
+
     /// <summary>
     /// Kontrola, kterou nejde vyjádřit atributem: poslední výskyt musí být platné datum.
     /// ASP.NET Core ji volá, až když projdou atributy jednotlivých vlastností.

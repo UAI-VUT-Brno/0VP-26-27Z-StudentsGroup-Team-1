@@ -69,7 +69,12 @@ public sealed class ApiResponseTimeTests : IClassFixture<PerformanceApiFactory>
     private static async Task WriteScenarioAsync(TimedHttpClient client)
     {
         var created = await client.SendAsync("POST /api/todos", HttpMethod.Post, "/api/todos",
-            new CreateTodoItemRequest { Title = "Zátěžový test", Priority = TodoPriority.High });
+            new CreateTodoItemRequest
+            {
+                Title = "Zátěžový test",
+                UserId = "honza",
+                Priority = TodoPriority.High
+            });
         var id = JsonSerializer.Deserialize<TodoItemDto>(created, TimedHttpClient.Json)!.Id;
 
         await client.SendAsync("PUT /api/todos/{id}", HttpMethod.Put, $"/api/todos/{id}",

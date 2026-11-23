@@ -23,7 +23,8 @@ public sealed class TodoMapperTests
         DueAtUtc = CreatedAt.AddDays(7),
         CreatedAtUtc = CreatedAt,
         CompletedAtUtc = isCompleted ? CreatedAt.AddHours(1) : null,
-        UpdatedAtUtc = CreatedAt.AddHours(1)
+        UpdatedAtUtc = CreatedAt.AddHours(1),
+        UserId = "honza",
     };
 
     // --- ToDto --------------------------------------------------------------
@@ -43,6 +44,7 @@ public sealed class TodoMapperTests
         Assert.Equal(entity.DueAtUtc, dto.DueAtUtc);
         Assert.Equal(entity.CreatedAtUtc, dto.CreatedAtUtc);
         Assert.Equal(entity.CompletedAtUtc, dto.CompletedAtUtc);
+        Assert.Equal(entity.UserId, dto.UserId);
     }
 
     [Fact]
@@ -134,6 +136,7 @@ public sealed class TodoMapperTests
         Title = "  Týdenní report  ",
         Description = "  Shrnout týden.  ",
         Priority = TodoPriority.High,
+        UserId = "honza",
         FirstDueAtUtc = FirstDue,
         RepeatCount = repeatCount
     };
