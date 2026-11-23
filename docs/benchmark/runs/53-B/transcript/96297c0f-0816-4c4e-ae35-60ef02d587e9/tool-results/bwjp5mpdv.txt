@@ -1,0 +1,1257 @@
+diff --git a/tests/API/RepeatingTodosEndpointTests.cs b/tests/API/RepeatingTodosEndpointTests.cs
+index 4bb3474..d1eb3a7 100644
+--- a/tests/API/RepeatingTodosEndpointTests.cs
++++ b/tests/API/RepeatingTodosEndpointTests.cs
+@@ -12,7 +12,7 @@ namespace UAI.ZeroVP.Tests.API;
+ public sealed class RepeatingTodosEndpointTests : IClassFixture<ApiTestFactory>
+ {
+     private const string ValidBody =
+-        """{"title":"Týdenní report","priority":"High","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""";
++        """{"title":"Týdenní report","priority":"High","userId":"jan.novak","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""";
+ 
+     private readonly HttpClient _client;
+ 
+@@ -67,17 +67,17 @@ public sealed class RepeatingTodosEndpointTests : IClassFixture<ApiTestFactory>
+     public static TheoryData<string, string> InvalidRequests => new()
+     {
+         // { tělo požadavku, klíč v "errors" odpovědi 400 }
+-        { """{"firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""",                       "Title" },
+-        { """{"title":"","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""",            "Title" },
+-        { """{"title":"Úkol","priority":"Urgent","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""", "$.priority" },
+-        { """{"title":"Úkol","repeatCount":3}""",                                               "FirstDueAtUtc" },
+-        { """{"title":"Úkol","firstDueAtUtc":null,"repeatCount":3}""",                          "FirstDueAtUtc" },
+-        { """{"title":"Úkol","firstDueAtUtc":"zítra","repeatCount":3}""",                       "$.firstDueAtUtc" },
+-        { """{"title":"Úkol","firstDueAtUtc":"9999-12-30T00:00:00Z","repeatCount":3}""",        "FirstDueAtUtc" },
+-        { """{"title":"Úkol","firstDueAtUtc":"2026-10-26T09:00:00Z"}""",                        "RepeatCount" },
+-        { """{"title":"Úkol","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":0}""",        "RepeatCount" },
+-        { """{"title":"Úkol","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":53}""",       "RepeatCount" },
+-        { """{"title":"Úkol","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":"3"}""",      "$.repeatCount" }
++        { """{"userId":"jan.novak","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""",                       "Title" },
++        { """{"title":"","userId":"jan.novak","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""",            "Title" },
++        { """{"title":"Úkol","priority":"Urgent","userId":"jan.novak","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""", "$.priority" },
++        { """{"title":"Úkol","userId":"jan.novak","repeatCount":3}""",                                               "FirstDueAtUtc" },
++        { """{"title":"Úkol","userId":"jan.novak","firstDueAtUtc":null,"repeatCount":3}""",                          "FirstDueAtUtc" },
++        { """{"title":"Úkol","userId":"jan.novak","firstDueAtUtc":"zítra","repeatCount":3}""",                       "$.firstDueAtUtc" },
++        { """{"title":"Úkol","userId":"jan.novak","firstDueAtUtc":"9999-12-30T00:00:00Z","repeatCount":3}""",        "FirstDueAtUtc" },
++        { """{"title":"Úkol","userId":"jan.novak","firstDueAtUtc":"2026-10-26T09:00:00Z"}""",                        "RepeatCount" },
++        { """{"title":"Úkol","userId":"jan.novak","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":0}""",        "RepeatCount" },
++        { """{"title":"Úkol","userId":"jan.novak","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":53}""",       "RepeatCount" },
++        { """{"title":"Úkol","userId":"jan.novak","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":"3"}""",      "$.repeatCount" }
+     };
+ 
+     [Theory]
+@@ -101,7 +101,7 @@ public sealed class RepeatingTodosEndpointTests : IClassFixture<ApiTestFactory>
+     public async Task PostTodo_WithoutDueDate_ReturnsDueAtUtcNull()
+     {
+         // Běžné založení úkolu zůstává kompatibilní; nové pole se posílá vždy, i s null.
+-        using var response = await PostJsonAsync("/api/todos", """{"title":"Úkol"}""");
++        using var response = await PostJsonAsync("/api/todos", """{"title":"Úkol","userId":"jan.novak"}""");
+ 
+         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+         using var json = await ReadJsonAsync(response);
+@@ -120,4 +120,4 @@ public sealed class RepeatingTodosEndpointTests : IClassFixture<ApiTestFactory>
+ 
+         return json.RootElement.GetProperty("todoCount").GetInt32();
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/tests/API/TodoMapperTests.cs b/tests/API/TodoMapperTests.cs
+index 945fbe5..02b0084 100644
+--- a/tests/API/TodoMapperTests.cs
++++ b/tests/API/TodoMapperTests.cs
+@@ -23,6 +23,7 @@ public sealed class TodoMapperTests
+         DueAtUtc = CreatedAt.AddDays(7),
+         CreatedAtUtc = CreatedAt,
+         CompletedAtUtc = isCompleted ? CreatedAt.AddHours(1) : null,
++        UserId = "jan.novak",
+         UpdatedAtUtc = CreatedAt.AddHours(1)
+     };
+ 
+@@ -69,6 +70,30 @@ public sealed class TodoMapperTests
+         Assert.Null(typeof(TodoItemDto).GetProperty(nameof(TodoItem.UpdatedAtUtc)));
+     }
+ 
++    // AC 3: odpověď API nese vlastníka úkolu.
++    [Fact]
++    public void ToDto_CopiesUserId()
++    {
++        var dto = CreateEntity().ToDto();
++
++        Assert.Equal("jan.novak", dto.UserId);
++    }
++
++    // AC 7: úkol ze starší verze souboru vlastníka nemá – v odpovědi zůstane null, ne "".
++    [Fact]
++    public void ToDto_NullUserId_StaysNull()
++    {
++        var entity = new TodoItem
++        {
++            Id = Guid.NewGuid(),
++            Title = "Ze starého souboru",
++            CreatedAtUtc = CreatedAt,
++            UpdatedAtUtc = CreatedAt
++        };
++
++        Assert.Null(entity.ToDto().UserId);
++    }
++
+     // --- ToEntity -----------------------------------------------------------
+ 
+     [Fact]
+@@ -94,7 +119,7 @@ public sealed class TodoMapperTests
+ 
+         Assert.Null(request.ToEntity(Now).DueAtUtc);
+     }
+-    
++
+     [Fact]
+     public void ToEntity_EachCallGeneratesDifferentId()
+     {
+@@ -125,6 +150,24 @@ public sealed class TodoMapperTests
+         Assert.Null(request.ToEntity(Now).Description);
+     }
+ 
++    // AC 1, 5: userId se uloží oříznutý o okolní mezery.
++    [Fact]
++    public void ToEntity_TrimsUserId()
++    {
++        var request = new CreateTodoItemRequest { Title = "Úkol", UserId = "  jan.novak  " };
++
++        Assert.Equal("jan.novak", request.ToEntity(Now).UserId);
++    }
++
++    // AC 5: velikost písmen se zachová – userId se nijak nenormalizuje.
++    [Fact]
++    public void ToEntity_KeepsUserIdCase()
++    {
++        var request = new CreateTodoItemRequest { Title = "Úkol", UserId = "Jan.Novak" };
++
++        Assert.Equal("Jan.Novak", request.ToEntity(Now).UserId);
++    }
++
+     // --- ToEntities (opakovaný úkol) ----------------------------------------
+ 
+     private static readonly DateTimeOffset FirstDue = new(2026, 10, 26, 9, 0, 0, TimeSpan.Zero);
+@@ -134,6 +177,7 @@ public sealed class TodoMapperTests
+         Title = "  Týdenní report  ",
+         Description = "  Shrnout týden.  ",
+         Priority = TodoPriority.High,
++        UserId = "  jan.novak  ",
+         FirstDueAtUtc = FirstDue,
+         RepeatCount = repeatCount
+     };
+@@ -178,6 +222,16 @@ public sealed class TodoMapperTests
+         });
+     }
+ 
++    // AC 1: každý výskyt opakovaného úkolu dostane stejného, oříznutého vlastníka.
++    [Fact]
++    public void ToEntities_CopiesTrimmedUserIdToEveryOccurrence()
++    {
++        var entities = CreateRepeatingRequest(repeatCount: 3).ToEntities(Now);
++
++        Assert.Equal(4, entities.Count);
++        Assert.All(entities, entity => Assert.Equal("jan.novak", entity.UserId));
++    }
++
+     [Fact]
+     public void ToEntities_EveryOccurrenceStartsIncompleteAndStampedWithGivenTime()
+     {
+@@ -247,6 +301,17 @@ public sealed class TodoMapperTests
+         Assert.Equal(CreatedAt, entity.CreatedAtUtc);
+     }
+ 
++    // AC 6: úprava úkolu vlastníka nemění – určuje se jen při vytvoření.
++    [Fact]
++    public void ApplyTo_KeepsUserId()
++    {
++        var entity = CreateEntity();
++
++        new UpdateTodoItemRequest { Title = "Nový název", IsCompleted = true }.ApplyTo(entity, Now);
++
++        Assert.Equal("jan.novak", entity.UserId);
++    }
++
+     [Fact]
+     public void ApplyTo_CompletedFlag_SetsCompletionTime()
+     {
+diff --git a/tests/API/TodoUserIdEndpointTests.cs b/tests/API/TodoUserIdEndpointTests.cs
+new file mode 100644
+index 0000000..4c355ba
+--- /dev/null
++++ b/tests/API/TodoUserIdEndpointTests.cs
+@@ -0,0 +1,237 @@
++﻿using System.Net;
++using System.Text;
++using System.Text.Json;
++using Microsoft.AspNetCore.Hosting;
++
++namespace UAI.ZeroVP.Tests.API;
++
++/// <summary>
++/// Vlastník úkolu (<c>userId</c>) přes skutečné HTTP. Na rozdíl od testů kontroleru tu běží
++/// i deserializace JSON a automatická validace <c>[ApiController]</c>, takže je vidět,
++/// co klient opravdu pošle a dostane zpět.
++/// </summary>
++public sealed class TodoUserIdEndpointTests : IClassFixture<ApiTestFactory>, IDisposable
++{
++    private const string TodosUrl = "/api/todos";
++    private const string RepeatUrl = "/api/todos/repeat";
++
++    private readonly ApiTestFactory _factory;
++    private readonly HttpClient _client;
++    private readonly string _directory = Path.Combine(Path.GetTempPath(), "uai-zerovp-json-tests", Guid.NewGuid().ToString("N"));
++
++    public TodoUserIdEndpointTests(ApiTestFactory factory)
++    {
++        _factory = factory;
++        _client = factory.CreateClient();
++    }
++
++    public void Dispose()
++    {
++        if (Directory.Exists(_directory))
++        {
++            Directory.Delete(_directory, recursive: true);
++        }
++    }
++
++    // --- Založení -----------------------------------------------------------
++
++    // AC 1, 5: POST /api/todos vrátí userId oříznutý a se zachovanou velikostí písmen.
++    [Fact]
++    public async Task PostTodo_WithUserId_Returns201WithTrimmedUserId()
++    {
++        using var response = await PostJsonAsync(TodosUrl, """{"title":"Úkol","userId":"  Jan.Novak  "}""");
++
++        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
++        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
++        using var json = await ReadJsonAsync(response);
++        Assert.Equal("Jan.Novak", json.RootElement.GetProperty("userId").GetString());
++    }
++
++    // AC 1: každý výskyt opakovaného úkolu nese stejný userId.
++    [Fact]
++    public async Task PostRepeat_WithUserId_EveryOccurrenceCarriesUserId()
++    {
++        using var response = await PostJsonAsync(
++            RepeatUrl,
++            """{"title":"Týdenní report","userId":"jan.novak","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""");
++
++        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
++        using var json = await ReadJsonAsync(response);
++        var occurrences = json.RootElement.EnumerateArray().ToList();
++        Assert.Equal(4, occurrences.Count);
++        Assert.All(occurrences, occurrence =>
++            Assert.Equal("jan.novak", occurrence.GetProperty("userId").GetString()));
++    }
++
++    public static TheoryData<string, string, string> InvalidUserIds()
++    {
++        // { adresa, část těla s userId (prázdná = pole chybí), klíč v "errors" odpovědi 400 }
++        var data = new TheoryData<string, string, string>();
++        foreach (var url in new[] { TodosUrl, RepeatUrl })
++        {
++            data.Add(url, "", "UserId");
++            data.Add(url, ",\"userId\":null", "UserId");
++            data.Add(url, ",\"userId\":\"\"", "UserId");
++            data.Add(url, ",\"userId\":\"   \"", "UserId");
++            data.Add(url, $",\"userId\":\"{new string('u', 101)}\"", "UserId");
++            data.Add(url, ",\"userId\":123", "$.userId");
++        }
++
++        return data;
++    }
++
++    // AC 2: neplatný userId vrátí 400 s chybou u userId a nevytvoří žádný úkol.
++    [Theory]
++    [MemberData(nameof(InvalidUserIds))]
++    public async Task Post_InvalidUserId_Returns400ValidationProblemAndCreatesNothing(
++        string url, string userIdMember, string errorKey)
++    {
++        var countBefore = await GetTodoCountAsync();
++
++        using var response = await PostJsonAsync(url, CreateBody(url, userIdMember));
++
++        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
++        using var json = await ReadJsonAsync(response);
++        Assert.Equal(400, json.RootElement.GetProperty("status").GetInt32());
++        Assert.True(
++            json.RootElement.GetProperty("errors").TryGetProperty(errorKey, out _),
++            $"Odpověď neobsahuje chybu pro {errorKey}: {json.RootElement}");
++        Assert.Equal(countBefore, await GetTodoCountAsync());
++    }
++
++    // AC 5: userId o délce přesně 100 znaků projde.
++    [Fact]
++    public async Task Post_UserIdAtLimit_Returns201()
++    {
++        var userId = new string('u', 100);
++
++        using var response = await PostJsonAsync(TodosUrl, CreateBody(TodosUrl, $",\"userId\":\"{userId}\""));
++
++        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
++        using var json = await ReadJsonAsync(response);
++        Assert.Equal(userId, json.RootElement.GetProperty("userId").GetString());
++    }
++
++    // --- Čtení --------------------------------------------------------------
++
++    // AC 3: GET /api/todos/{id} vrací userId.
++    [Fact]
++    public async Task GetById_ReturnsUserId()
++    {
++        var id = await CreateTodoAsync("jan.novak");
++
++        using var response = await _client.GetAsync($"{TodosUrl}/{id}");
++
++        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
++        using var json = await ReadJsonAsync(response);
++        Assert.Equal("jan.novak", json.RootElement.GetProperty("userId").GetString());
++    }
++
++    // AC 3: GET /api/todos vrací userId u každého úkolu.
++    [Fact]
++    public async Task GetAll_ReturnsUserId()
++    {
++        var id = await CreateTodoAsync("petra.svobodova");
++
++        using var response = await _client.GetAsync(TodosUrl);
++
++        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
++        using var json = await ReadJsonAsync(response);
++        var items = json.RootElement.EnumerateArray().ToList();
++        var item = Assert.Single(items, element => element.GetProperty("id").GetGuid() == id);
++        Assert.Equal("petra.svobodova", item.GetProperty("userId").GetString());
++        Assert.All(items, element => Assert.True(element.TryGetProperty("userId", out _)));
++    }
++
++    // --- Úprava -------------------------------------------------------------
++
++    // AC 6: userId v těle PUT se ignoruje a vlastník zůstane původní.
++    [Fact]
++    public async Task Put_WithDifferentUserId_KeepsOriginalOwner()
++    {
++        var id = await CreateTodoAsync("jan.novak");
++
++        using var updated = await _client.PutAsync(
++            $"{TodosUrl}/{id}",
++            new StringContent("""{"title":"Nový název","userId":"petra.svobodova"}""", Encoding.UTF8, "application/json"));
++
++        Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
++        using var updatedJson = await ReadJsonAsync(updated);
++        Assert.Equal("Nový název", updatedJson.RootElement.GetProperty("title").GetString());
++        Assert.Equal("jan.novak", updatedJson.RootElement.GetProperty("userId").GetString());
++
++        using var detail = await _client.GetAsync($"{TodosUrl}/{id}");
++        using var detailJson = await ReadJsonAsync(detail);
++        Assert.Equal("jan.novak", detailJson.RootElement.GetProperty("userId").GetString());
++    }
++
++    // --- Soubor ze starší verze ---------------------------------------------
++
++    // AC 3, 7: úkol ze souboru bez userId API vrátí se "userId": null.
++    [Fact]
++    public async Task Get_TaskFromFileWithoutUserId_ReturnsNullUserId()
++    {
++        const string legacyId = "0f8fad5b-d9cb-469f-a165-70867728950e";
++        Directory.CreateDirectory(_directory);
++        var filePath = Path.Combine(_directory, "todos.json");
++        await File.WriteAllTextAsync(filePath, """
++            [
++              {
++                "id": "0f8fad5b-d9cb-469f-a165-70867728950e",
++                "title": "Úkol ze starší verze",
++                "description": null,
++                "priority": "Normal",
++                "isCompleted": false,
++                "dueAtUtc": null,
++                "createdAtUtc": "2026-10-25T12:00:00+00:00",
++                "completedAtUtc": null,
++                "updatedAtUtc": "2026-10-25T12:00:00+00:00"
++              }
++            ]
++            """);
++        await using var factory = _factory.WithWebHostBuilder(builder => builder.UseSetting("Todo:Storage:FilePath", filePath));
++        using var client = factory.CreateClient();
++
++        using var detail = await client.GetAsync($"{TodosUrl}/{legacyId}");
++        Assert.Equal(HttpStatusCode.OK, detail.StatusCode);
++        using var detailJson = await ReadJsonAsync(detail);
++        Assert.Equal(JsonValueKind.Null, detailJson.RootElement.GetProperty("userId").ValueKind);
++
++        using var list = await client.GetAsync(TodosUrl);
++        Assert.Equal(HttpStatusCode.OK, list.StatusCode);
++        using var listJson = await ReadJsonAsync(list);
++        var item = Assert.Single(listJson.RootElement.EnumerateArray());
++        Assert.Equal(JsonValueKind.Null, item.GetProperty("userId").ValueKind);
++    }
++
++    // --- Pomocné metody -----------------------------------------------------
++
++    /// <summary>Tělo požadavku pro danou adresu; <paramref name="userIdMember"/> se vloží za název.</summary>
++    private static string CreateBody(string url, string userIdMember) =>
++        string.Equals(url, RepeatUrl, StringComparison.Ordinal)
++            ? $$"""{"title":"Úkol"{{userIdMember}},"firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}"""
++            : $$"""{"title":"Úkol"{{userIdMember}}}""";
++
++    /// <summary>Založí úkol se zadaným vlastníkem a vrátí jeho identifikátor.</summary>
++    private async Task<Guid> CreateTodoAsync(string userId)
++    {
++        using var response = await PostJsonAsync(TodosUrl, CreateBody(TodosUrl, $",\"userId\":\"{userId}\""));
++
++        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
++        using var json = await ReadJsonAsync(response);
++        return json.RootElement.GetProperty("id").GetGuid();
++    }
++
++    private Task<HttpResponseMessage> PostJsonAsync(string url, string body) =>
++        _client.PostAsync(url, new StringContent(body, Encoding.UTF8, "application/json"));
++
++    private static async Task<JsonDocument> ReadJsonAsync(HttpResponseMessage response) =>
++        JsonDocument.Parse(await response.Content.ReadAsStringAsync());
++
++    private async Task<int> GetTodoCountAsync()
++    {
++        using var json = JsonDocument.Parse(await _client.GetStringAsync("/api/info"));
++
++        return json.RootElement.GetProperty("todoCount").GetInt32();
++    }
++}
+diff --git a/tests/API/TodosControllerTests.cs b/tests/API/TodosControllerTests.cs
+index 402be25..739c8b1 100644
+--- a/tests/API/TodosControllerTests.cs
++++ b/tests/API/TodosControllerTests.cs
+@@ -31,7 +31,8 @@ public sealed class TodosControllerTests
+     private async Task<TodoItem> AddItemAsync(
+         string title = "Úkol",
+         TodoPriority priority = TodoPriority.Normal,
+-        bool isCompleted = false) =>
++        bool isCompleted = false,
++        string? userId = null) =>
+         await _repository.AddAsync(new TodoItem
+         {
+             Id = Guid.NewGuid(),
+@@ -40,6 +41,7 @@ public sealed class TodosControllerTests
+             IsCompleted = isCompleted,
+             CreatedAtUtc = Now.AddDays(-1),
+             CompletedAtUtc = isCompleted ? Now.AddHours(-1) : null,
++            UserId = userId,
+             UpdatedAtUtc = Now.AddDays(-1)
+         });
+ 
+@@ -95,6 +97,19 @@ public sealed class TodosControllerTests
+         Assert.Equal(isCompleted, Assert.Single(items).IsCompleted);
+     }
+ 
++    // AC 3: seznam vrací vlastníka každého úkolu, u úkolu bez vlastníka null.
++    [Fact]
++    public async Task GetAll_ReturnsUserId()
++    {
++        var owned = await AddItemAsync("S vlastníkem", TodoPriority.High, userId: "jan.novak");
++        var legacy = await AddItemAsync("Bez vlastníka", TodoPriority.Low);
++
++        var items = AssertOk(await CreateController().GetAll(isCompleted: null, CancellationToken.None));
++
++        Assert.Equal("jan.novak", Assert.Single(items, item => item.Id == owned.Id).UserId);
++        Assert.Null(Assert.Single(items, item => item.Id == legacy.Id).UserId);
++    }
++
+     // --- GET /api/todos/{id} ------------------------------------------------
+ 
+     [Fact]
+@@ -108,6 +123,17 @@ public sealed class TodosControllerTests
+         Assert.Equal("Napsat Dockerfile", dto.Title);
+     }
+ 
++    // AC 3: detail úkolu vrací jeho vlastníka.
++    [Fact]
++    public async Task GetById_ReturnsUserId()
++    {
++        var item = await AddItemAsync(userId: "jan.novak");
++
++        var dto = AssertOk(await CreateController().GetById(item.Id, CancellationToken.None));
++
++        Assert.Equal("jan.novak", dto.UserId);
++    }
++
+     [Fact]
+     public async Task GetById_UnknownId_ReturnsNotFoundProblem()
+     {
+@@ -150,7 +176,7 @@ public sealed class TodosControllerTests
+         Assert.Equal(Now, stored.CreatedAtUtc);
+         Assert.False(stored.IsCompleted);
+     }
+-    
++
+     [Fact]
+     public async Task Create_ReturnsItemWithoutDueDate()
+     {
+@@ -160,6 +186,21 @@ public sealed class TodosControllerTests
+         Assert.Null(dto.DueAtUtc);
+     }
+ 
++    // AC 1: založený úkol vrátí i uloží oříznutého vlastníka.
++    [Fact]
++    public async Task Create_ReturnsAndStoresUserId()
++    {
++        var request = new CreateTodoItemRequest { Title = "Nový úkol", UserId = "  jan.novak  " };
++
++        var result = await CreateController().Create(request, CancellationToken.None);
++
++        var dto = Assert.IsType<TodoItemDto>(Assert.IsType<CreatedAtRouteResult>(result.Result).Value);
++        Assert.Equal("jan.novak", dto.UserId);
++        var stored = await _repository.GetByIdAsync(dto.Id);
++        Assert.NotNull(stored);
++        Assert.Equal("jan.novak", stored.UserId);
++    }
++
+     // --- POST /api/todos/repeat ---------------------------------------------
+ 
+     private static readonly DateTimeOffset FirstDue = new(2026, 9, 7, 9, 0, 0, TimeSpan.Zero);
+@@ -169,6 +210,7 @@ public sealed class TodosControllerTests
+         Title = "Týdenní report",
+         Description = "Shrnout týden.",
+         Priority = TodoPriority.High,
++        UserId = "jan.novak",
+         FirstDueAtUtc = FirstDue,
+         RepeatCount = repeatCount
+     };
+@@ -243,6 +285,23 @@ public sealed class TodosControllerTests
+         Assert.False(untouched.IsCompleted);
+     }
+ 
++    // AC 1: každý výskyt opakovaného úkolu nese vlastníka v odpovědi i v úložišti.
++    [Fact]
++    public async Task CreateRepeating_EveryOccurrenceCarriesUserId()
++    {
++        var occurrences = AssertCreatedOccurrences(
++            await CreateController().CreateRepeating(CreateRepeatingRequest(repeatCount: 3), CancellationToken.None));
++
++        Assert.Equal(4, occurrences.Count);
++        foreach (var occurrence in occurrences)
++        {
++            Assert.Equal("jan.novak", occurrence.UserId);
++            var stored = await _repository.GetByIdAsync(occurrence.Id);
++            Assert.NotNull(stored);
++            Assert.Equal("jan.novak", stored.UserId);
++        }
++    }
++
+     // --- PUT /api/todos/{id} ------------------------------------------------
+ 
+     [Fact]
+@@ -294,6 +353,21 @@ public sealed class TodosControllerTests
+         AssertNotFoundProblem(result.Result, item.Id);
+     }
+ 
++    // AC 6: úprava přes PUT vlastníka nezmění.
++    [Fact]
++    public async Task Update_KeepsOriginalUserId()
++    {
++        var item = await AddItemAsync("Původní", userId: "jan.novak");
++        var request = new UpdateTodoItemRequest { Title = "Nový název", Priority = TodoPriority.High };
++
++        var dto = AssertOk(await CreateController().Update(item.Id, request, CancellationToken.None));
++
++        Assert.Equal("jan.novak", dto.UserId);
++        var stored = await _repository.GetByIdAsync(item.Id);
++        Assert.NotNull(stored);
++        Assert.Equal("jan.novak", stored.UserId);
++    }
++
+     // --- POST /api/todos/{id}/complete --------------------------------------
+ 
+     [Fact]
+@@ -339,6 +413,21 @@ public sealed class TodosControllerTests
+         AssertNotFoundProblem(result.Result, item.Id);
+     }
+ 
++    // AC 6: dokončení úkolu vlastníka zachová.
++    [Fact]
++    public async Task Complete_KeepsUserId()
++    {
++        var item = await AddItemAsync(userId: "jan.novak");
++
++        var dto = AssertOk(await CreateController().Complete(item.Id, CancellationToken.None));
++
++        Assert.True(dto.IsCompleted);
++        Assert.Equal("jan.novak", dto.UserId);
++        var stored = await _repository.GetByIdAsync(item.Id);
++        Assert.NotNull(stored);
++        Assert.Equal("jan.novak", stored.UserId);
++    }
++
+     // --- DELETE /api/todos/{id} ---------------------------------------------
+ 
+     [Fact]
+diff --git a/tests/DTO/CreateRepeatingTodoItemRequestTests.cs b/tests/DTO/CreateRepeatingTodoItemRequestTests.cs
+index 9c70c20..97235a1 100644
+--- a/tests/DTO/CreateRepeatingTodoItemRequestTests.cs
++++ b/tests/DTO/CreateRepeatingTodoItemRequestTests.cs
+@@ -1,4 +1,5 @@
+-﻿using UAI.ZeroVP.DTO;
++﻿using System.Text.Json;
++using UAI.ZeroVP.DTO;
+ using static UAI.ZeroVP.Tests.DTO.ValidationHelper;
+ 
+ namespace UAI.ZeroVP.Tests.DTO;
+@@ -11,9 +12,13 @@ public sealed class CreateRepeatingTodoItemRequestTests
+ {
+     private static readonly DateTimeOffset FirstDue = new(2026, 10, 26, 9, 0, 0, TimeSpan.Zero);
+ 
++    /// <summary>Stejné nastavení jako ve webovém API (camelCase názvy vlastností).</summary>
++    private static readonly JsonSerializerOptions WebOptions = new(JsonSerializerDefaults.Web);
++
+     private static CreateRepeatingTodoItemRequest CreateValidRequest() => new()
+     {
+         Title = "Týdenní report",
++        UserId = "jan.novak",
+         FirstDueAtUtc = FirstDue,
+         RepeatCount = 3
+     };
+@@ -67,6 +72,41 @@ public sealed class CreateRepeatingTodoItemRequestTests
+         AssertSingleErrorFor(request, nameof(CreateRepeatingTodoItemRequest.Priority));
+     }
+ 
++    // AC 2, 5: chybějící, null, prázdný i jen z mezer složený userId validace odmítne.
++    // Požadavek vzniká z JSON stejně jako v API – jen tak se do vlastnosti typu string dostane null.
++    [Theory]
++    [InlineData("""{"title":"Úkol","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""")]
++    [InlineData("""{"title":"Úkol","userId":null,"firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""")]
++    [InlineData("""{"title":"Úkol","userId":"","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""")]
++    [InlineData("""{"title":"Úkol","userId":"   ","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""")]
++    public void Validate_MissingUserId_FailsOnUserId(string json)
++    {
++        var request = Assert.IsType<CreateRepeatingTodoItemRequest>(
++            JsonSerializer.Deserialize<CreateRepeatingTodoItemRequest>(json, WebOptions));
++
++        AssertSingleErrorFor(request, nameof(CreateRepeatingTodoItemRequest.UserId));
++    }
++
++    // AC 5: userId o délce 1 i 100 znaků projde.
++    [Theory]
++    [InlineData(1)]
++    [InlineData(100)]
++    public void Validate_UserIdWithinLimit_IsValid(int length)
++    {
++        var request = CreateValidRequest() with { UserId = new string('u', length) };
++
++        Assert.Empty(Validate(request));
++    }
++
++    // AC 2, 5: userId delší než 100 znaků validace odmítne.
++    [Fact]
++    public void Validate_UserIdOverLimit_FailsOnUserId()
++    {
++        var request = CreateValidRequest() with { UserId = new string('u', 101) };
++
++        AssertSingleErrorFor(request, nameof(CreateRepeatingTodoItemRequest.UserId));
++    }
++
+     // --- Termín prvního výskytu ---------------------------------------------
+ 
+     [Fact]
+@@ -135,4 +175,4 @@ public sealed class CreateRepeatingTodoItemRequestTests
+ 
+         AssertSingleErrorFor(request, nameof(CreateRepeatingTodoItemRequest.RepeatCount));
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/tests/DTO/CreateTodoItemRequestTests.cs b/tests/DTO/CreateTodoItemRequestTests.cs
+index 74ab5ad..edd6d61 100644
+--- a/tests/DTO/CreateTodoItemRequestTests.cs
++++ b/tests/DTO/CreateTodoItemRequestTests.cs
+@@ -1,4 +1,5 @@
+-﻿using UAI.ZeroVP.DTO;
++﻿using System.Text.Json;
++using UAI.ZeroVP.DTO;
+ using static UAI.ZeroVP.Tests.DTO.ValidationHelper;
+ 
+ namespace UAI.ZeroVP.Tests.DTO;
+@@ -6,10 +7,15 @@ namespace UAI.ZeroVP.Tests.DTO;
+ /// <summary>Validační pravidla požadavku na založení úkolu (POST /api/todos).</summary>
+ public sealed class CreateTodoItemRequestTests
+ {
++    private const string ValidUserId = "jan.novak";
++
++    /// <summary>Stejné nastavení jako ve webovém API (camelCase názvy vlastností).</summary>
++    private static readonly JsonSerializerOptions WebOptions = new(JsonSerializerDefaults.Web);
++
+     [Fact]
+-    public void Validate_TitleOnly_IsValid()
++    public void Validate_RequiredFieldsOnly_IsValid()
+     {
+-        var request = new CreateTodoItemRequest { Title = "Napsat Dockerfile" };
++        var request = new CreateTodoItemRequest { Title = "Napsat Dockerfile", UserId = ValidUserId };
+ 
+         Assert.Empty(Validate(request));
+     }
+@@ -28,7 +34,7 @@ public sealed class CreateTodoItemRequestTests
+     [InlineData("   ")] // [Required] bez AllowEmptyStrings odmítne i samé mezery
+     public void Validate_MissingTitle_FailsOnTitle(string? title)
+     {
+-        var request = new CreateTodoItemRequest { Title = title! };
++        var request = new CreateTodoItemRequest { Title = title!, UserId = ValidUserId };
+ 
+         AssertSingleErrorFor(request, nameof(CreateTodoItemRequest.Title));
+     }
+@@ -38,7 +44,7 @@ public sealed class CreateTodoItemRequestTests
+     [InlineData(200)]
+     public void Validate_TitleWithinLimit_IsValid(int length)
+     {
+-        var request = new CreateTodoItemRequest { Title = new string('a', length) };
++        var request = new CreateTodoItemRequest { Title = new string('a', length), UserId = ValidUserId };
+ 
+         Assert.Empty(Validate(request));
+     }
+@@ -46,7 +52,7 @@ public sealed class CreateTodoItemRequestTests
+     [Fact]
+     public void Validate_TitleOverLimit_FailsOnTitle()
+     {
+-        var request = new CreateTodoItemRequest { Title = new string('a', 201) };
++        var request = new CreateTodoItemRequest { Title = new string('a', 201), UserId = ValidUserId };
+ 
+         AssertSingleErrorFor(request, nameof(CreateTodoItemRequest.Title));
+     }
+@@ -57,7 +63,7 @@ public sealed class CreateTodoItemRequestTests
+     [InlineData("krátký popis")]
+     public void Validate_OptionalDescription_IsValid(string? description)
+     {
+-        var request = new CreateTodoItemRequest { Title = "Úkol", Description = description };
++        var request = new CreateTodoItemRequest { Title = "Úkol", Description = description, UserId = ValidUserId };
+ 
+         Assert.Empty(Validate(request));
+     }
+@@ -65,7 +71,7 @@ public sealed class CreateTodoItemRequestTests
+     [Fact]
+     public void Validate_DescriptionAtLimit_IsValid()
+     {
+-        var request = new CreateTodoItemRequest { Title = "Úkol", Description = new string('a', 1000) };
++        var request = new CreateTodoItemRequest { Title = "Úkol", Description = new string('a', 1000), UserId = ValidUserId };
+ 
+         Assert.Empty(Validate(request));
+     }
+@@ -73,7 +79,7 @@ public sealed class CreateTodoItemRequestTests
+     [Fact]
+     public void Validate_DescriptionOverLimit_FailsOnDescription()
+     {
+-        var request = new CreateTodoItemRequest { Title = "Úkol", Description = new string('a', 1001) };
++        var request = new CreateTodoItemRequest { Title = "Úkol", Description = new string('a', 1001), UserId = ValidUserId };
+ 
+         AssertSingleErrorFor(request, nameof(CreateTodoItemRequest.Description));
+     }
+@@ -84,7 +90,7 @@ public sealed class CreateTodoItemRequestTests
+     [InlineData(TodoPriority.High)]
+     public void Validate_DefinedPriority_IsValid(TodoPriority priority)
+     {
+-        var request = new CreateTodoItemRequest { Title = "Úkol", Priority = priority };
++        var request = new CreateTodoItemRequest { Title = "Úkol", Priority = priority, UserId = ValidUserId };
+ 
+         Assert.Empty(Validate(request));
+     }
+@@ -93,8 +99,43 @@ public sealed class CreateTodoItemRequestTests
+     public void Validate_UndefinedPriority_FailsOnPriority()
+     {
+         // Číslo mimo výčet – JSON deserializace by ho jako číslo propustila.
+-        var request = new CreateTodoItemRequest { Title = "Úkol", Priority = (TodoPriority)99 };
++        var request = new CreateTodoItemRequest { Title = "Úkol", Priority = (TodoPriority)99, UserId = ValidUserId };
+ 
+         AssertSingleErrorFor(request, nameof(CreateTodoItemRequest.Priority));
+     }
++
++    // AC 2, 5: chybějící, null, prázdný i jen z mezer složený userId validace odmítne.
++    // Požadavek vzniká z JSON stejně jako v API – jen tak se do vlastnosti typu string dostane null.
++    [Theory]
++    [InlineData("""{"title":"Úkol"}""")]
++    [InlineData("""{"title":"Úkol","userId":null}""")]
++    [InlineData("""{"title":"Úkol","userId":""}""")]
++    [InlineData("""{"title":"Úkol","userId":"   "}""")]
++    public void Validate_MissingUserId_FailsOnUserId(string json)
++    {
++        var request = Assert.IsType<CreateTodoItemRequest>(
++            JsonSerializer.Deserialize<CreateTodoItemRequest>(json, WebOptions));
++
++        AssertSingleErrorFor(request, nameof(CreateTodoItemRequest.UserId));
++    }
++
++    // AC 5: userId o délce 1 i 100 znaků projde.
++    [Theory]
++    [InlineData(1)]
++    [InlineData(100)]
++    public void Validate_UserIdWithinLimit_IsValid(int length)
++    {
++        var request = new CreateTodoItemRequest { Title = "Úkol", UserId = new string('u', length) };
++
++        Assert.Empty(Validate(request));
++    }
++
++    // AC 2, 5: userId delší než 100 znaků validace odmítne.
++    [Fact]
++    public void Validate_UserIdOverLimit_FailsOnUserId()
++    {
++        var request = new CreateTodoItemRequest { Title = "Úkol", UserId = new string('u', 101) };
++
++        AssertSingleErrorFor(request, nameof(CreateTodoItemRequest.UserId));
++    }
+ }
+diff --git a/tests/Data/InMemoryTodoRepositoryTests.cs b/tests/Data/InMemoryTodoRepositoryTests.cs
+index 14281c6..cda0cb7 100644
+--- a/tests/Data/InMemoryTodoRepositoryTests.cs
++++ b/tests/Data/InMemoryTodoRepositoryTests.cs
+@@ -22,17 +22,19 @@ public sealed class InMemoryTodoRepositoryTests
+         TodoPriority priority = TodoPriority.Normal,
+         bool isCompleted = false,
+         DateTimeOffset? createdAtUtc = null,
+-        DateTimeOffset? dueAtUtc = null) => new()
++        DateTimeOffset? dueAtUtc = null,
++        string? userId = null) => new()
+ 
+-    {
+-        Id = Guid.NewGuid(),
+-        Title = title,
+-        Priority = priority,
+-        IsCompleted = isCompleted,
+-        DueAtUtc = dueAtUtc,
+-        CreatedAtUtc = createdAtUtc ?? Now,
+-        UpdatedAtUtc = createdAtUtc ?? Now
+-    };
++        {
++            Id = Guid.NewGuid(),
++            Title = title,
++            Priority = priority,
++            IsCompleted = isCompleted,
++            DueAtUtc = dueAtUtc,
++            UserId = userId,
++            CreatedAtUtc = createdAtUtc ?? Now,
++            UpdatedAtUtc = createdAtUtc ?? Now
++        };
+ 
+     // --- Ukázková data ------------------------------------------------------
+ 
+@@ -97,6 +99,21 @@ public sealed class InMemoryTodoRepositoryTests
+         Assert.Equal("Původní název", (await repository.GetByIdAsync(item.Id))!.Title);
+     }
+ 
++    // AC 7: úkoly ze starší verze souboru vlastníka nemají – načtou se s null, ne s chybou.
++    [Fact]
++    public async Task Constructor_InitialItemsWithoutUserId_AreLoadedWithNullUserId()
++    {
++        var legacy = CreateItem("Ze starého souboru");
++
++        var repository = new InMemoryTodoRepository(
++            new InMemoryTodoOptions { SeedSampleData = true },
++            initialItems: [legacy]);
++
++        var stored = Assert.Single(await repository.GetAllAsync());
++        Assert.Equal(legacy.Id, stored.Id);
++        Assert.Null(stored.UserId);
++    }
++
+     [Fact]
+     public async Task Constructor_Seed_UsesInjectedTimeProvider()
+     {
+@@ -177,7 +194,22 @@ public sealed class InMemoryTodoRepositoryTests
+ 
+         await Assert.ThrowsAsync<ArgumentNullException>(() => repository.AddAsync(null!));
+     }
+-    
++
++    // AC 1, 4: vlastník se uloží s úkolem a vrátí se beze změny, včetně velikosti písmen.
++    [Fact]
++    public async Task AddAsync_ItemWithUserId_StoresUserId()
++    {
++        var repository = CreateEmptyRepository();
++        var item = CreateItem(userId: "Jan.Novak");
++
++        var returned = await repository.AddAsync(item);
++
++        Assert.Equal("Jan.Novak", returned.UserId);
++        var stored = await repository.GetByIdAsync(item.Id);
++        Assert.NotNull(stored);
++        Assert.Equal("Jan.Novak", stored.UserId);
++    }
++
+     // --- Přidání více úkolů najednou ----------------------------------------
+ 
+     [Fact]
+@@ -214,6 +246,29 @@ public sealed class InMemoryTodoRepositoryTests
+         Assert.Equal("První", (await repository.GetByIdAsync(items[0].Id))!.Title);
+     }
+ 
++    // AC 1, 4: v dávce (opakovaný úkol) si každý úkol nese svého vlastníka.
++    [Fact]
++    public async Task AddRangeAsync_EveryItemKeepsItsUserId()
++    {
++        var repository = CreateEmptyRepository();
++        var items = new[]
++        {
++            CreateItem("První", userId: "jan.novak"),
++            CreateItem("Druhý", userId: "petra.svobodova"),
++            CreateItem("Třetí", userId: "jan.novak")
++        };
++
++        var returned = await repository.AddRangeAsync(items);
++
++        Assert.Equal(items.Select(item => item.UserId), returned.Select(item => item.UserId));
++        foreach (var item in items)
++        {
++            var stored = await repository.GetByIdAsync(item.Id);
++            Assert.NotNull(stored);
++            Assert.Equal(item.UserId, stored.UserId);
++        }
++    }
++
+     [Fact]
+     public async Task AddRangeAsync_EmptyBatch_StoresNothing()
+     {
+@@ -411,6 +466,26 @@ public sealed class InMemoryTodoRepositoryTests
+         Assert.Equal("Uloženo", (await repository.GetByIdAsync(item.Id))!.Title);
+     }
+ 
++    // AC 6: úprava načteného úkolu (jako v API: přečíst, změnit, uložit) vlastníka zachová.
++    [Fact]
++    public async Task UpdateAsync_KeepsUserId()
++    {
++        var repository = CreateEmptyRepository();
++        var item = CreateItem("Původní", userId: "jan.novak");
++        await repository.AddAsync(item);
++
++        var loaded = await repository.GetByIdAsync(item.Id);
++        Assert.NotNull(loaded);
++        loaded.Title = "Nový název";
++        loaded.IsCompleted = true;
++        Assert.True(await repository.UpdateAsync(loaded));
++
++        var stored = await repository.GetByIdAsync(item.Id);
++        Assert.NotNull(stored);
++        Assert.Equal("Nový název", stored.Title);
++        Assert.Equal("jan.novak", stored.UserId);
++    }
++
+     [Fact]
+     public async Task UpdateAsync_Null_ThrowsArgumentNullException()
+     {
+diff --git a/tests/Data/JsonFileTodoRepositoryTests.cs b/tests/Data/JsonFileTodoRepositoryTests.cs
+index 3434583..d3412d5 100644
+--- a/tests/Data/JsonFileTodoRepositoryTests.cs
++++ b/tests/Data/JsonFileTodoRepositoryTests.cs
+@@ -38,10 +38,11 @@ public sealed class JsonFileTodoRepositoryTests : IDisposable
+             new InMemoryTodoOptions { SeedSampleData = seedSampleData });
+     }
+ 
+-    private static TodoItem CreateItem(string title = "Úkol") => new()
++    private static TodoItem CreateItem(string title = "Úkol", string? userId = null) => new()
+     {
+         Id = Guid.NewGuid(),
+         Title = title,
++        UserId = userId,
+         CreatedAtUtc = DateTimeOffset.UtcNow
+     };
+ 
+@@ -97,6 +98,56 @@ public sealed class JsonFileTodoRepositoryTests : IDisposable
+         Assert.Equal(2 * tasksPerInstance, await CreateRepository().CountAsync());
+     }
+ 
++    // AC 1, 4, 7: vlastník projde souborem – druhá instance ho přečte beze změny.
++    [Fact]
++    public async Task Add_WithUserId_IsVisibleThroughAnotherInstance()
++    {
++        var instanceA = CreateRepository();
++        var instanceB = CreateRepository();
++        var item = CreateItem("Z instance A", userId: "jan.novak");
++
++        await instanceA.AddAsync(item);
++
++        var stored = await instanceB.GetByIdAsync(item.Id);
++        Assert.NotNull(stored);
++        Assert.Equal("jan.novak", stored.UserId);
++    }
++
++    // --- Soubor ze starší verze ---------------------------------------------
++
++    // AC 7: úkoly ze souboru bez userId přežijí zápis nového úkolu a zůstanou bez vlastníka.
++    [Fact]
++    public async Task LegacyFileWithoutUserId_TasksSurviveAWrite()
++    {
++        var legacyId = Guid.Parse("0f8fad5b-d9cb-469f-a165-70867728950e");
++        Directory.CreateDirectory(_directory);
++        await File.WriteAllTextAsync(FilePath, """
++            [
++              {
++                "id": "0f8fad5b-d9cb-469f-a165-70867728950e",
++                "title": "Úkol ze starší verze",
++                "description": null,
++                "priority": "Normal",
++                "isCompleted": false,
++                "dueAtUtc": null,
++                "createdAtUtc": "2026-10-25T12:00:00+00:00",
++                "completedAtUtc": null,
++                "updatedAtUtc": "2026-10-25T12:00:00+00:00"
++              }
++            ]
++            """);
++        var repository = CreateRepository();
++        var added = CreateItem("Nový úkol", userId: "jan.novak");
++
++        await repository.AddAsync(added);
++
++        var items = await CreateRepository().GetAllAsync();
++        Assert.Equal(2, items.Count);
++        Assert.Null(Assert.Single(items, item => item.Id == legacyId).UserId);
++        Assert.Equal("jan.novak", Assert.Single(items, item => item.Id == added.Id).UserId);
++        Assert.Contains("\"userId\": null", await File.ReadAllTextAsync(FilePath));
++    }
++
+     // --- Chybějící soubor ---------------------------------------------------
+ 
+     [Fact]
+diff --git a/tests/Data/JsonFileTodoStoreTests.cs b/tests/Data/JsonFileTodoStoreTests.cs
+index eb57054..d218ec7 100644
+--- a/tests/Data/JsonFileTodoStoreTests.cs
++++ b/tests/Data/JsonFileTodoStoreTests.cs
+@@ -72,6 +72,7 @@ public sealed class JsonFileTodoStoreTests : IDisposable
+             DueAtUtc = Now.AddDays(7),
+             CreatedAtUtc = Now.AddDays(-1),
+             CompletedAtUtc = Now,
++            UserId = "jan.novak",
+             UpdatedAtUtc = Now
+         };
+ 
+@@ -137,6 +138,24 @@ public sealed class JsonFileTodoStoreTests : IDisposable
+         Assert.Contains("\"priority\": \"High\"", json);
+     }
+ 
++    // AC 7: vlastník se ukládá do souboru, aby ho viděly i ostatní instance a další běh.
++    [Fact]
++    public void Save_WritesUserId()
++    {
++        var item = new TodoItem
++        {
++            Id = Guid.NewGuid(),
++            Title = "Úkol",
++            UserId = "jan.novak",
++            CreatedAtUtc = Now,
++            UpdatedAtUtc = Now
++        };
++
++        CreateStore().Save([item]);
++
++        Assert.Contains("\"userId\": \"jan.novak\"", File.ReadAllText(FilePath));
++    }
++
+     [Fact]
+     public void Save_LogsCount()
+     {
+@@ -155,6 +174,55 @@ public sealed class JsonFileTodoStoreTests : IDisposable
+         Assert.Equal(LogLevel.Information, _logger.LatestRecord.Level);
+     }
+ 
++    // --- Soubor ze starší verze ---------------------------------------------
++
++    // AC 7: soubor zapsaný před zavedením userId se načte celý a vlastník je null.
++    // Nesmí se považovat za poškozený – to by ho odsunulo stranou a úkoly by z API zmizely.
++    [Fact]
++    public void Load_FileWithoutUserId_LoadsTasksWithNullUserId()
++    {
++        WriteFile("""
++            [
++              {
++                "id": "0f8fad5b-d9cb-469f-a165-70867728950e",
++                "title": "Úkol ze starší verze",
++                "description": "Uloženo před zavedením vlastníka",
++                "priority": "High",
++                "isCompleted": true,
++                "dueAtUtc": "2026-11-02T12:00:00+00:00",
++                "createdAtUtc": "2026-10-25T12:00:00+00:00",
++                "completedAtUtc": "2026-10-26T12:00:00+00:00",
++                "updatedAtUtc": "2026-10-26T12:00:00+00:00"
++              }
++            ]
++            """);
++
++        var loaded = CreateStore().Load();
++
++        Assert.NotNull(loaded);
++        var item = Assert.Single(loaded);
++        Assert.Equal(Guid.Parse("0f8fad5b-d9cb-469f-a165-70867728950e"), item.Id);
++        Assert.Equal("Úkol ze starší verze", item.Title);
++        Assert.Null(item.UserId);
++        Assert.Equal(["todos.json"], Directory.GetFiles(_directory).Select(Path.GetFileName));
++        Assert.DoesNotContain(_logger.Collector.GetSnapshot(), record => record.Level == LogLevel.Error);
++    }
++
++    // AC 7: po prvním zápisu se u starších úkolů uloží "userId": null – i to se musí načíst.
++    [Fact]
++    public void Load_UserIdNull_LoadsTaskWithNullUserId()
++    {
++        WriteFile("""
++            [{"id": "0f8fad5b-d9cb-469f-a165-70867728950e", "title": "A", "createdAtUtc": "2026-10-26T12:00:00Z", "userId": null}]
++            """);
++
++        var loaded = CreateStore().Load();
++
++        Assert.NotNull(loaded);
++        Assert.Null(Assert.Single(loaded).UserId);
++        Assert.DoesNotContain(_logger.Collector.GetSnapshot(), record => record.Level == LogLevel.Error);
++    }
++
+     // --- Poškozený soubor ---------------------------------------------------
+ 
+     [Theory]
+diff --git a/tests/Data/TodoItemTests.cs b/tests/Data/TodoItemTests.cs
+index e1a135f..c1b96ae 100644
+--- a/tests/Data/TodoItemTests.cs
++++ b/tests/Data/TodoItemTests.cs
+@@ -22,6 +22,7 @@ public sealed class TodoItemTests
+         DueAtUtc = CreatedAt.AddDays(7),
+         CreatedAtUtc = CreatedAt,
+         CompletedAtUtc = CreatedAt.AddHours(2),
++        UserId = "jan.novak",
+         UpdatedAtUtc = CreatedAt.AddHours(3)
+     };
+ 
+diff --git a/tests/OpenApi/OpenApiDocumentTests.cs b/tests/OpenApi/OpenApiDocumentTests.cs
+index d33b31e..0d14c9e 100644
+--- a/tests/OpenApi/OpenApiDocumentTests.cs
++++ b/tests/OpenApi/OpenApiDocumentTests.cs
+@@ -24,9 +24,9 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
+ {
+     /// <summary>Identifikátor, který v úložišti není (ukázková data mají náhodné GUID).</summary>
+     private const string MissingId = "00000000-0000-0000-0000-000000000001";
+-    
++
+     /// <summary>Platné tělo požadavku <c>POST /api/todos/repeat</c>.</summary>
+-    private const string RepeatBody = "{\"title\":\"Týdenní report\",\"firstDueAtUtc\":\"2026-10-26T09:00:00Z\",\"repeatCount\":3}";
++    private const string RepeatBody = "{\"title\":\"Týdenní report\",\"userId\":\"jan.novak\",\"firstDueAtUtc\":\"2026-10-26T09:00:00Z\",\"repeatCount\":3}";
+ 
+     private readonly OpenApiTestFactory _factory;
+     private readonly HttpClient _client;
+@@ -138,6 +138,45 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
+         Assert.Equal("date-time", firstDue.Format);
+     }
+ 
++    // AC 8: oba požadavky na založení uvádějí userId jako povinný, s délkou 1–100 znaků.
++    [Theory]
++    [InlineData("CreateTodoItemRequest")]
++    [InlineData("CreateRepeatingTodoItemRequest")]
++    public async Task UserId_IsDocumentedAsRequiredWithLengthLimits(string schemaName)
++    {
++        var schema = await LoadSchemaAsync(schemaName);
++
++        Assert.NotNull(schema.Required);
++        Assert.Contains("userId", schema.Required);
++        Assert.NotNull(schema.Properties);
++        var userId = Assert.Contains("userId", schema.Properties);
++        Assert.Equal(1, userId.MinLength);
++        Assert.Equal(100, userId.MaxLength);
++    }
++
++    // AC 3, 8: odpověď uvádí userId vždy (required), jako řetězec nebo null u úkolů ze starších souborů.
++    [Fact]
++    public async Task TodoItemDto_DocumentsUserIdAsRequired()
++    {
++        var schema = await LoadSchemaAsync("TodoItemDto");
++
++        Assert.NotNull(schema.Required);
++        Assert.Contains("userId", schema.Required);
++        Assert.NotNull(schema.Properties);
++        Assert.Equal(JsonSchemaType.String | JsonSchemaType.Null, Assert.Contains("userId", schema.Properties).Type);
++    }
++
++    // AC 6, 8: vlastníka nejde změnit, proto ho schéma úpravy vůbec neuvádí.
++    [Fact]
++    public async Task UpdateRequest_DoesNotDocumentUserId()
++    {
++        var schema = await LoadSchemaAsync("UpdateTodoItemRequest");
++
++        Assert.NotNull(schema.Properties);
++        Assert.DoesNotContain("userId", schema.Properties.Keys);
++        Assert.DoesNotContain("userId", schema.Required ?? new HashSet<string>());
++    }
++
+     [Fact]
+     public async Task CreatedResponse_DocumentsLocationHeader()
+     {
+@@ -236,7 +275,7 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
+     public async Task SuccessfulTodoLifecycle_MatchesDocument()
+     {
+         var document = await LoadDocumentAsync();
+-        const string body = "{\"title\":\"Napsat Dockerfile\",\"priority\":\"High\"}";
++        const string body = "{\"title\":\"Napsat Dockerfile\",\"priority\":\"High\",\"userId\":\"jan.novak\"}";
+ 
+         using var created = await SendAsync(_client, "POST", "/api/todos", body, "application/json");
+         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+@@ -286,6 +325,14 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
+         return OpenApiDocument.Parse(json, OpenApiConstants.Json).Document!;
+     }
+ 
++    private async Task<IOpenApiSchema> LoadSchemaAsync(string name)
++    {
++        var schemas = (await LoadDocumentAsync()).Components?.Schemas;
++        Assert.NotNull(schemas);
++
++        return Assert.Contains(name, schemas);
++    }
++
+     private static OpenApiOperation GetOperation(OpenApiDocument document, string method, string path)
+     {
+         Assert.True(document.Paths.TryGetValue(path, out var pathItem), $"Cesta {path} v dokumentu chybí.");
+@@ -352,7 +399,7 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
+ 
+         public Task<TodoItem> AddAsync(TodoItem item, CancellationToken cancellationToken = default) => throw Failure();
+ 
+-        public Task<IReadOnlyList<TodoItem>> AddRangeAsync(IEnumerable<TodoItem> items, CancellationToken cancellationToken = default) => 
++        public Task<IReadOnlyList<TodoItem>> AddRangeAsync(IEnumerable<TodoItem> items, CancellationToken cancellationToken = default) =>
+             throw Failure();
+ 
+         public Task<bool> UpdateAsync(TodoItem item, CancellationToken cancellationToken = default) => throw Failure();
+diff --git a/tests/Performance/ApiResponseTimeTests.cs b/tests/Performance/ApiResponseTimeTests.cs
+index bc9f8af..e29dd28 100644
+--- a/tests/Performance/ApiResponseTimeTests.cs
++++ b/tests/Performance/ApiResponseTimeTests.cs
+@@ -36,7 +36,7 @@ public sealed class ApiResponseTimeTests : IClassFixture<PerformanceApiFactory>
+         _output = output;
+         _responseTimeBudgetMs = factory.Services.GetRequiredService<IConfiguration>().GetValue<double>("Performance:ResponseTimeBudgetMs");
+     }
+-    
++
+     [PerformanceFact]
+     public async Task ReadEndpoints_UnderConcurrentLoad_StayWithinBudget()
+     {
+@@ -69,7 +69,7 @@ public sealed class ApiResponseTimeTests : IClassFixture<PerformanceApiFactory>
+     private static async Task WriteScenarioAsync(TimedHttpClient client)
+     {
+         var created = await client.SendAsync("POST /api/todos", HttpMethod.Post, "/api/todos",
+-            new CreateTodoItemRequest { Title = "Zátěžový test", Priority = TodoPriority.High });
++            new CreateTodoItemRequest { Title = "Zátěžový test", Priority = TodoPriority.High, UserId = "zatezovy.test" });
+         var id = JsonSerializer.Deserialize<TodoItemDto>(created, TimedHttpClient.Json)!.Id;
+ 
+         await client.SendAsync("PUT /api/todos/{id}", HttpMethod.Put, $"/api/todos/{id}",
+@@ -79,7 +79,7 @@ public sealed class ApiResponseTimeTests : IClassFixture<PerformanceApiFactory>
+     }
+ 
+     // --- Pomocné metody ------------------------------------------------------
+-    
++
+     /// <summary>
+     /// Scénář nejdřív jednou proběhne „naprázdno“ se všemi uživateli najednou. Tím se zkompiluje
+     /// kód (JIT) a thread pool naroste na potřebný počet vláken ještě před měřením.
+@@ -101,7 +101,7 @@ public sealed class ApiResponseTimeTests : IClassFixture<PerformanceApiFactory>
+         return items[0].Id;
+     }
+ 
+-        private void AssertWithinBudget(IReadOnlyList<RequestSample> samples)
++    private void AssertWithinBudget(IReadOnlyList<RequestSample> samples)
+     {
+         var statistics = EndpointStatistics.From(samples);
+ 
+@@ -123,4 +123,4 @@ public sealed class ApiResponseTimeTests : IClassFixture<PerformanceApiFactory>
+             Assert.True(endpoint.P99Ms <= _responseTimeBudgetMs,
+                 $"{endpoint.Endpoint}: 99. percentil {endpoint.P99Ms:F1} ms překročil limit {_responseTimeBudgetMs} ms."));
+     }
+-}
+\ No newline at end of file
++}
