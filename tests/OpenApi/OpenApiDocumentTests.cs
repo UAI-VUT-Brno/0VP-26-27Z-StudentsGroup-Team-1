@@ -1,6 +1,7 @@
 ﻿using System.Globalization;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
@@ -67,8 +68,8 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
     [InlineData("POST", "/api/todos", "201 400 415 500")]
     [InlineData("POST", "/api/todos/repeat", "201 400 415 500")]
     [InlineData("GET", "/api/todos/{id}", "200 404 500")]
-    [InlineData("PUT", "/api/todos/{id}", "200 400 404 415 500")]
-    [InlineData("DELETE", "/api/todos/{id}", "204 404 500")]
+    [InlineData("PUT", "/api/todos/{id}", "200 400 404 409 415 500")]
+    [InlineData("DELETE", "/api/todos/{id}", "204 400 404 409 500")]
     [InlineData("POST", "/api/todos/{id}/complete", "200 404 500")]
     [InlineData("GET", "/api/info", "200 500")]
     [InlineData("GET", "/health", "200 503")]
@@ -232,7 +233,7 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
     [InlineData("PUT", "/api/todos/" + MissingId, "/api/todos/{id}", "{\"title\":\"Úkol\",\"version\":1}", "application/json", 404)]
     [InlineData("PUT", "/api/todos/" + MissingId, "/api/todos/{id}", "Úkol", "text/plain", 415)]
     [InlineData("POST", "/api/todos/" + MissingId + "/complete", "/api/todos/{id}/complete", null, null, 404)]
-    [InlineData("DELETE", "/api/todos/" + MissingId, "/api/todos/{id}", null, null, 404)]
+    [InlineData("DELETE", "/api/todos/" + MissingId + "?version=1", "/api/todos/{id}", null, null, 404)]
     [InlineData("GET", "/api/info", "/api/info", null, null, 200)]
     [InlineData("GET", "/health", "/health", null, null, 200)]
     public async Task Response_MatchesDocument(
@@ -269,8 +270,9 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
         using var completed = await SendAsync(_client, "POST", url + "/complete");
         Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
         await AssertDocumentedAsync(document, "POST", "/api/todos/{id}/complete", completed);
+        var version = await ReadVersionAsync(completed);
 
-        using var deleted = await SendAsync(_client, "DELETE", url);
+        using var deleted = await SendAsync(_client, "DELETE", $"{url}?version={version}");
         Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
         await AssertDocumentedAsync(document, "DELETE", "/api/todos/{id}", deleted);
     }
@@ -321,6 +323,14 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
         }
 
         return client.SendAsync(request);
+    }
+
+    /// <summary>Přečte z odpovědi s úkolem jeho aktuální verzi – tu musí poslat další zápis.</summary>
+    private static async Task<long> ReadVersionAsync(HttpResponseMessage response)
+    {
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        return json.RootElement.GetProperty("version").GetInt64();
     }
 
     /// <summary>Ověří, že dokument uvádí status kód, typ obsahu i povinné hlavičky odpovědi.</summary>

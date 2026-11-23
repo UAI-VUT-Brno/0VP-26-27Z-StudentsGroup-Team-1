@@ -76,8 +76,11 @@ public sealed class ApiResponseTimeTests : IClassFixture<PerformanceApiFactory>
 
         await client.SendAsync("PUT /api/todos/{id}", HttpMethod.Put, $"/api/todos/{id}",
             new UpdateTodoItemRequest { Title = "Zátěžový test – upraveno", Priority = TodoPriority.Low, Version = item.Version });
-        await client.SendAsync("POST /api/todos/{id}/complete", HttpMethod.Post, $"/api/todos/{id}/complete");
-        await client.SendAsync("DELETE /api/todos/{id}", HttpMethod.Delete, $"/api/todos/{id}");
+        var completed = await client.SendAsync("POST /api/todos/{id}/complete", HttpMethod.Post, $"/api/todos/{id}/complete");
+        var completedItem = JsonSerializer.Deserialize<TodoItemDto>(completed, TimedHttpClient.Json);
+        Assert.NotNull(completedItem);
+
+        await client.SendAsync("DELETE /api/todos/{id}", HttpMethod.Delete, $"/api/todos/{id}?version={completedItem.Version}");
     }
 
     // --- Pomocné metody ------------------------------------------------------

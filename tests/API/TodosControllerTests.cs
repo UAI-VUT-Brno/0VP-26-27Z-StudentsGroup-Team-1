@@ -277,7 +277,7 @@ public sealed class TodosControllerTests
             await controller.CreateRepeating(CreateRepeatingRequest(repeatCount: 2), CancellationToken.None));
 
         await controller.Complete(occurrences[0].Id, CancellationToken.None);
-        await controller.Delete(occurrences[1].Id, CancellationToken.None);
+        await controller.Delete(occurrences[1].Id, version: occurrences[1].Version, CancellationToken.None);
 
         Assert.True((await _repository.GetByIdAsync(occurrences[0].Id))!.IsCompleted);
         Assert.Null(await _repository.GetByIdAsync(occurrences[1].Id));
@@ -389,7 +389,7 @@ public sealed class TodosControllerTests
     {
         var item = await AddItemAsync();
 
-        var result = await CreateController().Delete(item.Id, CancellationToken.None);
+        var result = await CreateController().Delete(item.Id, version: item.Version, CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
         Assert.Null(await _repository.GetByIdAsync(item.Id));
@@ -400,7 +400,7 @@ public sealed class TodosControllerTests
     {
         var id = Guid.NewGuid();
 
-        var result = await CreateController().Delete(id, CancellationToken.None);
+        var result = await CreateController().Delete(id, version: 1, CancellationToken.None);
 
         AssertNotFoundProblem(result, id);
     }

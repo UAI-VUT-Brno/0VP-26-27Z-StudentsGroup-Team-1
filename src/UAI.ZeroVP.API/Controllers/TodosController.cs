@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc;
 using UAI.ZeroVP.API.Mapping;
 using UAI.ZeroVP.Data.Abstractions;
 using UAI.ZeroVP.DTO;
@@ -129,24 +130,33 @@ public sealed class TodosController : ControllerBase
     /// Jde o úplnou aktualizaci: hodnota, která v těle chybí, se nastaví na výchozí
     /// (<c>description</c> na <c>null</c>, <c>priority</c> na <c>Normal</c>, <c>isCompleted</c> na <c>false</c>).
     /// Uživatel, kterému úkol patří (<c>userId</c>), se nemění.
+    /// Pole <c>version</c> musí obsahovat verzi, kterou klient naposledy četl. Pokud úkol mezitím
+    /// změnil někdo jiný, vrátí se 409 a nic se nezapíše; po úspěšné změně se verze zvýší o 1.
     /// </remarks>
     /// <param name="id">Identifikátor úkolu.</param>
     /// <param name="cancellationToken">Token pro zrušení operace.</param>
     /// <param name="request">Nové hodnoty úkolu.</param>
-    /// <response code="200">Aktualizovaný úkol.</response>
-    /// <response code="400">Tělo požadavku není platný JSON nebo neprošlo validací.</response>
+    /// <response code="200">Aktualizovaný úkol s novou verzí.</response>
+    /// <response code="400">Tělo požadavku není platný JSON nebo neprošlo validací (např. chybí <c>version</c> nebo není kladné celé číslo).</response>
     /// <response code="404">Úkol se zadaným identifikátorem neexistuje.</response>
+    /// <response code="409">Verze v těle nesouhlasí s uloženou – úkol mezitím změnil někdo jiný. Nic se nezapsalo; <c>detail</c> uvádí aktuální verzi.</response>
     /// <response code="415">Tělo požadavku není ve formátu JSON (chybí hlavička <c>Content-Type: application/json</c>).</response>
     [HttpPut("{id:guid}")]
     [ProducesResponseType(typeof(TodoItemDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status415UnsupportedMediaType)]
     public async Task<ActionResult<TodoItemDto>> Update(
         Guid id,
         [FromBody] UpdateTodoItemRequest request,
         CancellationToken cancellationToken)
     {
+        // Validace [ApiController] chybějící verzi odmítne už dřív; tady jen pojistka,
+        // aby chybějící verze nikdy nevedla k zápisu bez kontroly.
+        var expectedVersion = request.Version
+            ?? throw new ArgumentException("Verze úkolu chybí.", nameof(request));
+
         var entity = await _repository.GetByIdAsync(id, cancellationToken);
         if (entity is null)
         {
@@ -155,13 +165,23 @@ public sealed class TodosController : ControllerBase
 
         request.ApplyTo(entity, _timeProvider.GetUtcNow());
 
-        return await _repository.UpdateAsync(entity, cancellationToken)
-            ? Ok(entity.ToDto())
-            : NotFoundTodo(id);
+        // Verzi porovnává až repozitář, v jednom kroku se zápisem. Porovnání tady
+        // s právě načtenou entitou by nestačilo – jiná instance může zapsat mezi čtením a zápisem.
+        var result = await _repository.UpdateIfVersionMatchesAsync(entity, expectedVersion, cancellationToken);
+
+        return result switch
+        {
+            { Status: TodoWriteStatus.Success, Item: { } updated } => Ok(updated.ToDto()),
+            { Status: TodoWriteStatus.Conflict, Item: { } current } => ConflictTodo(id, current.Version, expectedVersion),
+            _ => NotFoundTodo(id)
+        };
     }
 
     /// <summary>Označí úkol za dokončený.</summary>
-    /// <remarks>U už dokončeného úkolu se nic nezmění; <c>completedAtUtc</c> zůstane původní.</remarks>
+    /// <remarks>
+    /// U už dokončeného úkolu se nic nezmění; <c>completedAtUtc</c> zůstane původní.
+    /// Verze úkolu se přesto zvýší o 1 (zvyšuje ji každý zápis) a odpověď ji obsahuje.
+    /// </remarks>
     /// <param name="id">Identifikátor úkolu.</param>
     /// <param name="cancellationToken">Token pro zrušení operace.</param>
     /// <response code="200">Úkol po změně stavu.</response>
@@ -171,37 +191,73 @@ public sealed class TodosController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<TodoItemDto>> Complete(Guid id, CancellationToken cancellationToken)
     {
-        var entity = await _repository.GetByIdAsync(id, cancellationToken);
-        if (entity is null)
+        // Klient tu verzi neposílá, zápis se proto podmíní verzí, kterou jsme právě přečetli.
+        // Když úkol mezitím změnil jiný požadavek, repozitář vrátí konflikt a úkol se načte znovu:
+        // dokončí se jeho nejnovější stav a souběžná změna se nepřepíše. Každé další kolo znamená,
+        // že jiný zápis uspěl, takže cyklus nemůže běžet donekonečna; ukončí ho i zrušení požadavku.
+        while (true)
         {
-            return NotFoundTodo(id);
+            var entity = await _repository.GetByIdAsync(id, cancellationToken);
+            if (entity is null)
+            {
+                return NotFoundTodo(id);
+            }
+
+            entity.SetCompletionState(isCompleted: true, _timeProvider.GetUtcNow());
+
+            var result = await _repository.UpdateIfVersionMatchesAsync(entity, entity.Version, cancellationToken);
+            if (result.Status != TodoWriteStatus.Conflict)
+            {
+                return result is { Status: TodoWriteStatus.Success, Item: { } completed }
+                    ? Ok(completed.ToDto())
+                    : NotFoundTodo(id);
+            }
         }
-
-        entity.SetCompletionState(isCompleted: true, _timeProvider.GetUtcNow());
-
-        return await _repository.UpdateAsync(entity, cancellationToken)
-            ? Ok(entity.ToDto())
-            : NotFoundTodo(id);
     }
 
     /// <summary>Smaže úkol.</summary>
+    /// <remarks>
+    /// Úkol se smaže jen tehdy, když <c>version</c> odpovídá uložené verzi.
+    /// Jinak by se smazala i změna, kterou klient ještě neviděl.
+    /// </remarks>
     /// <param name="id">Identifikátor úkolu.</param>
+    /// <param name="version">Verze úkolu, kterou klient naposledy četl. Povinná, kladné celé číslo.</param>
     /// <param name="cancellationToken">Token pro zrušení operace.</param>
     /// <response code="204">Úkol byl smazán.</response>
+    /// <response code="400">Parametr <c>version</c> chybí nebo není kladné celé číslo.</response>
     /// <response code="404">Úkol se zadaným identifikátorem neexistuje.</response>
+    /// <response code="409">Verze nesouhlasí s uloženou – úkol mezitím změnil někdo jiný. Nic se nesmazalo; <c>detail</c> uvádí aktuální verzi.</response>
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Delete(
+        Guid id,
+        [FromQuery]
+        [Required(ErrorMessage = "Verze úkolu je povinná.")]
+        [Range(1, long.MaxValue, ErrorMessage = "Verze úkolu musí být kladné celé číslo.")]
+        long? version,
+        CancellationToken cancellationToken)
     {
-        if (!await _repository.DeleteAsync(id, cancellationToken))
+        // Stejná pojistka jako u Update: bez verze se nikdy nesmaže bez kontroly.
+        var expectedVersion = version
+            ?? throw new ArgumentException("Verze úkolu chybí.", nameof(version));
+
+        var result = await _repository.DeleteIfVersionMatchesAsync(id, expectedVersion, cancellationToken);
+
+        switch (result)
         {
-            return NotFoundTodo(id);
+            case { Status: TodoWriteStatus.Success }:
+                _logger.LogInformation("Smazán úkol {TodoId}.", id);
+                return NoContent();
+
+            case { Status: TodoWriteStatus.Conflict, Item: { } current }:
+                return ConflictTodo(id, current.Version, expectedVersion);
+
+            default:
+                return NotFoundTodo(id);
         }
-
-        _logger.LogInformation("Smazán úkol {TodoId}.", id);
-
-        return NoContent();
     }
 
     /// <summary>
@@ -217,4 +273,14 @@ public sealed class TodosController : ControllerBase
         statusCode: StatusCodes.Status404NotFound,
         title: "Úkol nenalezen",
         detail: $"Úkol s identifikátorem {id} neexistuje.");
+
+    /// <summary>
+    /// Jednotná odpověď 409 ve formátu ProblemDetails. <c>detail</c> uvádí aktuální verzi,
+    /// aby klient poznal, že má úkol načíst znovu a změnu zopakovat nad novým stavem.
+    /// </summary>
+    private ObjectResult ConflictTodo(Guid id, long currentVersion, long expectedVersion) => Problem(
+        statusCode: StatusCodes.Status409Conflict,
+        title: "Konflikt verzí úkolu",
+        detail: $"Úkol s identifikátorem {id} má aktuální verzi {currentVersion}, požadavek uváděl verzi {expectedVersion}. "
+            + "Načtěte úkol znovu a změnu zopakujte.");
 }
