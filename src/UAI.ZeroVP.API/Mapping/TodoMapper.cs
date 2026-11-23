@@ -21,7 +21,8 @@ public static class TodoMapper
         IsCompleted = entity.IsCompleted,
         DueAtUtc = entity.DueAtUtc,
         CreatedAtUtc = entity.CreatedAtUtc,
-        CompletedAtUtc = entity.CompletedAtUtc
+        CompletedAtUtc = entity.CompletedAtUtc,
+        Version = entity.Version
     };
 
     /// <summary>Vytvoří novou entitu z požadavku na založení úkolu.</summary>

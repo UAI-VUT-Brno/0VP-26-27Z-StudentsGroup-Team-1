@@ -65,7 +65,7 @@ public sealed class TodoUserIdEndpointTests : IClassFixture<ApiTestFactory>
         using var created = await SendJsonAsync(HttpMethod.Post, "/api/todos", """{"userId":"jan.novak","title":"Úkol"}""");
         var url = created.Headers.Location!;
 
-        using var updated = await SendJsonAsync(HttpMethod.Put, url.ToString(), """{"userId":"někdo.jiný","title":"Nový název"}""");
+        using var updated = await SendJsonAsync(HttpMethod.Put, url.ToString(), """{"userId":"někdo.jiný","title":"Nový název","version":1}""");
 
         Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
         using var json = await ReadJsonAsync(updated);

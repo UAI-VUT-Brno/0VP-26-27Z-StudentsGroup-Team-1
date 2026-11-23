@@ -229,7 +229,7 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
     [InlineData("POST", "/api/todos/repeat", "/api/todos/repeat", "{\"title\":\"Úkol\",\"repeatCount\":0}", "application/json", 400)]
     [InlineData("POST", "/api/todos/repeat", "/api/todos/repeat", "Úkol", "text/plain", 415)]
     [InlineData("GET", "/api/todos/" + MissingId, "/api/todos/{id}", null, null, 404)]
-    [InlineData("PUT", "/api/todos/" + MissingId, "/api/todos/{id}", "{\"title\":\"Úkol\"}", "application/json", 404)]
+    [InlineData("PUT", "/api/todos/" + MissingId, "/api/todos/{id}", "{\"title\":\"Úkol\",\"version\":1}", "application/json", 404)]
     [InlineData("PUT", "/api/todos/" + MissingId, "/api/todos/{id}", "Úkol", "text/plain", 415)]
     [InlineData("POST", "/api/todos/" + MissingId + "/complete", "/api/todos/{id}/complete", null, null, 404)]
     [InlineData("DELETE", "/api/todos/" + MissingId, "/api/todos/{id}", null, null, 404)]
@@ -251,6 +251,7 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
     {
         var document = await LoadDocumentAsync();
         const string body = "{\"userId\":\"jan.novak\",\"title\":\"Napsat Dockerfile\",\"priority\":\"High\"}";
+        const string updateBody = "{\"title\":\"Napsat Dockerfile\",\"priority\":\"High\",\"version\":1}";
 
         using var created = await SendAsync(_client, "POST", "/api/todos", body, "application/json");
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
@@ -261,7 +262,7 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
         Assert.Equal(HttpStatusCode.OK, detail.StatusCode);
         await AssertDocumentedAsync(document, "GET", "/api/todos/{id}", detail);
 
-        using var updated = await SendAsync(_client, "PUT", url, body, "application/json");
+        using var updated = await SendAsync(_client, "PUT", url, updateBody, "application/json");
         Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
         await AssertDocumentedAsync(document, "PUT", "/api/todos/{id}", updated);
 

@@ -32,7 +32,7 @@ public sealed record TodoItemDto
 
     /// <summary>Příznak, zda je úkol hotový.</summary>
     public required bool IsCompleted { get; init; }
-    
+
     /// <summary>Termín splnění (UTC), nebo <c>null</c> pokud úkol termín nemá.</summary>
     public required DateTimeOffset? DueAtUtc { get; init; }
     /// <summary>Okamžik vytvoření (UTC).</summary>
@@ -40,4 +40,12 @@ public sealed record TodoItemDto
 
     /// <summary>Okamžik dokončení (UTC), nebo <c>null</c> pokud úkol hotový není.</summary>
     public required DateTimeOffset? CompletedAtUtc { get; init; }
+
+    /// <summary>
+    /// Verze úkolu, kterou spravuje server; každá úspěšná změna ji zvýší o 1.
+    /// Klient ji posílá zpět při úpravě (<c>PUT</c>, v těle) a při smazání (<c>DELETE</c>, jako <c>?version=</c>),
+    /// aby server poznal, že úkol mezitím nezměnil někdo jiný.
+    /// </summary>
+    /// <example>1</example>
+    public required long Version { get; init; }
 }

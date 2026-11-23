@@ -36,7 +36,7 @@ public sealed class ApiResponseTimeTests : IClassFixture<PerformanceApiFactory>
         _output = output;
         _responseTimeBudgetMs = factory.Services.GetRequiredService<IConfiguration>().GetValue<double>("Performance:ResponseTimeBudgetMs");
     }
-    
+
     [PerformanceFact]
     public async Task ReadEndpoints_UnderConcurrentLoad_StayWithinBudget()
     {
@@ -70,16 +70,18 @@ public sealed class ApiResponseTimeTests : IClassFixture<PerformanceApiFactory>
     {
         var created = await client.SendAsync("POST /api/todos", HttpMethod.Post, "/api/todos",
             new CreateTodoItemRequest { UserId = "zatez", Title = "Zátěžový test", Priority = TodoPriority.High });
-        var id = JsonSerializer.Deserialize<TodoItemDto>(created, TimedHttpClient.Json)!.Id;
+        var item = JsonSerializer.Deserialize<TodoItemDto>(created, TimedHttpClient.Json);
+        Assert.NotNull(item);
+        var id = item.Id;
 
         await client.SendAsync("PUT /api/todos/{id}", HttpMethod.Put, $"/api/todos/{id}",
-            new UpdateTodoItemRequest { Title = "Zátěžový test – upraveno", Priority = TodoPriority.Low });
+            new UpdateTodoItemRequest { Title = "Zátěžový test – upraveno", Priority = TodoPriority.Low, Version = item.Version });
         await client.SendAsync("POST /api/todos/{id}/complete", HttpMethod.Post, $"/api/todos/{id}/complete");
         await client.SendAsync("DELETE /api/todos/{id}", HttpMethod.Delete, $"/api/todos/{id}");
     }
 
     // --- Pomocné metody ------------------------------------------------------
-    
+
     /// <summary>
     /// Scénář nejdřív jednou proběhne „naprázdno“ se všemi uživateli najednou. Tím se zkompiluje
     /// kód (JIT) a thread pool naroste na potřebný počet vláken ještě před měřením.
@@ -101,7 +103,7 @@ public sealed class ApiResponseTimeTests : IClassFixture<PerformanceApiFactory>
         return items[0].Id;
     }
 
-        private void AssertWithinBudget(IReadOnlyList<RequestSample> samples)
+    private void AssertWithinBudget(IReadOnlyList<RequestSample> samples)
     {
         var statistics = EndpointStatistics.From(samples);
 

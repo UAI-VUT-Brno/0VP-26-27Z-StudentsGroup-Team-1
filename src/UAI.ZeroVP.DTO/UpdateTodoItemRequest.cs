@@ -7,6 +7,7 @@ namespace UAI.ZeroVP.DTO;
 /// Vstup pro úplnou aktualizaci úkolu (HTTP PUT /api/todos/{id}).
 /// Jde o "full update" – neposlané hodnoty se přepíší výchozími.
 /// Uživatel, kterému úkol patří, se změnit nedá; pole <c>userId</c> se v těle ignoruje.
+/// Pole <c>version</c> nese verzi, kterou klient naposledy četl, aby nepřepsal novější změnu někoho jiného.
 /// </summary>
 public sealed record UpdateTodoItemRequest
 {
@@ -33,4 +34,18 @@ public sealed record UpdateTodoItemRequest
     /// <summary>Příznak dokončení úkolu. Výchozí hodnota je <c>false</c>.</summary>
     [DefaultValue(false)]
     public bool IsCompleted { get; init; }
+
+    /// <summary>
+    /// Verze úkolu, kterou klient naposledy četl (pole <c>version</c> z odpovědi). Povinná, kladné celé číslo.
+    /// Liší-li se od uložené verze, úkol mezitím změnil někdo jiný a server změnu odmítne.
+    /// </summary>
+    /// <remarks>
+    /// Typ s <c>?</c>, aby šlo poznat chybějící hodnotu: jinak by se dosadila 0
+    /// a <c>[Required]</c> by nic nenašel. Bez klíčového slova <c>required</c> ze stejného důvodu
+    /// jako u <see cref="CreateTodoItemRequest.Title"/>.
+    /// </remarks>
+    /// <example>1</example>
+    [Required(ErrorMessage = "Verze úkolu je povinná.")]
+    [Range(1, long.MaxValue, ErrorMessage = "Verze úkolu musí být kladné celé číslo.")]
+    public long? Version { get; init; }
 }

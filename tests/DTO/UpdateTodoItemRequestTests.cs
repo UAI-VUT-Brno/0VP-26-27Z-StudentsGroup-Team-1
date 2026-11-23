@@ -12,7 +12,7 @@ public sealed class UpdateTodoItemRequestTests
     [Fact]
     public void Validate_TitleOnly_IsValid()
     {
-        var request = new UpdateTodoItemRequest { Title = "Napsat Dockerfile" };
+        var request = new UpdateTodoItemRequest { Title = "Napsat Dockerfile", Version = 1 };
 
         Assert.Empty(Validate(request));
     }
@@ -21,7 +21,7 @@ public sealed class UpdateTodoItemRequestTests
     public void Defaults_WhenNotSet_AreNormalPriorityAndNotCompleted()
     {
         // Full update: neposlané hodnoty se přepíší právě těmito výchozími.
-        var request = new UpdateTodoItemRequest { Title = "Úkol" };
+        var request = new UpdateTodoItemRequest { Title = "Úkol", Version = 1 };
 
         Assert.Equal(TodoPriority.Normal, request.Priority);
         Assert.False(request.IsCompleted);
@@ -33,7 +33,7 @@ public sealed class UpdateTodoItemRequestTests
     [InlineData("   ")]
     public void Validate_MissingTitle_FailsOnTitle(string? title)
     {
-        var request = new UpdateTodoItemRequest { Title = title! };
+        var request = new UpdateTodoItemRequest { Title = title!, Version = 1 };
 
         AssertSingleErrorFor(request, nameof(UpdateTodoItemRequest.Title));
     }
@@ -43,7 +43,7 @@ public sealed class UpdateTodoItemRequestTests
     [InlineData(200)]
     public void Validate_TitleWithinLimit_IsValid(int length)
     {
-        var request = new UpdateTodoItemRequest { Title = new string('a', length) };
+        var request = new UpdateTodoItemRequest { Title = new string('a', length), Version = 1 };
 
         Assert.Empty(Validate(request));
     }
@@ -51,7 +51,7 @@ public sealed class UpdateTodoItemRequestTests
     [Fact]
     public void Validate_TitleOverLimit_FailsOnTitle()
     {
-        var request = new UpdateTodoItemRequest { Title = new string('a', 201) };
+        var request = new UpdateTodoItemRequest { Title = new string('a', 201), Version = 1 };
 
         AssertSingleErrorFor(request, nameof(UpdateTodoItemRequest.Title));
     }
@@ -59,7 +59,7 @@ public sealed class UpdateTodoItemRequestTests
     [Fact]
     public void Validate_DescriptionAtLimit_IsValid()
     {
-        var request = new UpdateTodoItemRequest { Title = "Úkol", Description = new string('a', 1000) };
+        var request = new UpdateTodoItemRequest { Title = "Úkol", Description = new string('a', 1000), Version = 1 };
 
         Assert.Empty(Validate(request));
     }
@@ -67,7 +67,7 @@ public sealed class UpdateTodoItemRequestTests
     [Fact]
     public void Validate_DescriptionOverLimit_FailsOnDescription()
     {
-        var request = new UpdateTodoItemRequest { Title = "Úkol", Description = new string('a', 1001) };
+        var request = new UpdateTodoItemRequest { Title = "Úkol", Description = new string('a', 1001), Version = 1 };
 
         AssertSingleErrorFor(request, nameof(UpdateTodoItemRequest.Description));
     }
@@ -75,7 +75,7 @@ public sealed class UpdateTodoItemRequestTests
     [Fact]
     public void Validate_UndefinedPriority_FailsOnPriority()
     {
-        var request = new UpdateTodoItemRequest { Title = "Úkol", Priority = (TodoPriority)99 };
+        var request = new UpdateTodoItemRequest { Title = "Úkol", Priority = (TodoPriority)99, Version = 1 };
 
         AssertSingleErrorFor(request, nameof(UpdateTodoItemRequest.Priority));
     }
@@ -85,7 +85,41 @@ public sealed class UpdateTodoItemRequestTests
     [InlineData(false)]
     public void Validate_AnyCompletionState_IsValid(bool isCompleted)
     {
-        var request = new UpdateTodoItemRequest { Title = "Úkol", IsCompleted = isCompleted };
+        var request = new UpdateTodoItemRequest { Title = "Úkol", IsCompleted = isCompleted, Version = 1 };
+
+        Assert.Empty(Validate(request));
+    }
+
+    // --- Verze úkolu ---------------------------------------------------------
+
+    // AC 3: Chybějící verze je chyba validace (400), ne tiché přeskočení kontroly.
+    [Fact]
+    public void Validate_MissingVersion_FailsOnVersion()
+    {
+        var request = new UpdateTodoItemRequest { Title = "Úkol" };
+
+        AssertSingleErrorFor(request, nameof(UpdateTodoItemRequest.Version));
+    }
+
+    // AC 3: Nekladná verze je chyba validace (400).
+    [Theory]
+    [InlineData(0L)]
+    [InlineData(-1L)]
+    [InlineData(long.MinValue)]
+    public void Validate_NonPositiveVersion_FailsOnVersion(long version)
+    {
+        var request = new UpdateTodoItemRequest { Title = "Úkol", Version = version };
+
+        AssertSingleErrorFor(request, nameof(UpdateTodoItemRequest.Version));
+    }
+
+    // AC 2: Každá kladná verze projde validací; o shodě rozhoduje až repozitář.
+    [Theory]
+    [InlineData(1L)]
+    [InlineData(long.MaxValue)]
+    public void Validate_PositiveVersion_IsValid(long version)
+    {
+        var request = new UpdateTodoItemRequest { Title = "Úkol", Version = version };
 
         Assert.Empty(Validate(request));
     }

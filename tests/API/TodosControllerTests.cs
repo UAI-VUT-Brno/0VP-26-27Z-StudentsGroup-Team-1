@@ -292,7 +292,7 @@ public sealed class TodosControllerTests
     public async Task Update_ExistingItem_ReturnsOkAndStoresChanges()
     {
         var item = await AddItemAsync("Původní");
-        var request = new UpdateTodoItemRequest { Title = "Nový název", Priority = TodoPriority.High };
+        var request = new UpdateTodoItemRequest { Title = "Nový název", Priority = TodoPriority.High, Version = item.Version };
 
         var dto = AssertOk(await CreateController().Update(item.Id, request, CancellationToken.None));
 
@@ -307,7 +307,7 @@ public sealed class TodosControllerTests
     public async Task Update_MarkAsCompleted_SetsCompletionTime()
     {
         var item = await AddItemAsync();
-        var request = new UpdateTodoItemRequest { Title = "Úkol", IsCompleted = true };
+        var request = new UpdateTodoItemRequest { Title = "Úkol", IsCompleted = true, Version = item.Version };
 
         var dto = AssertOk(await CreateController().Update(item.Id, request, CancellationToken.None));
 
@@ -320,7 +320,7 @@ public sealed class TodosControllerTests
     {
         var id = Guid.NewGuid();
 
-        var result = await CreateController().Update(id, new UpdateTodoItemRequest { Title = "Úkol" }, CancellationToken.None);
+        var result = await CreateController().Update(id, new UpdateTodoItemRequest { Title = "Úkol", Version = 1 }, CancellationToken.None);
 
         AssertNotFoundProblem(result.Result, id);
         Assert.Equal(0, await _repository.CountAsync());
@@ -332,7 +332,7 @@ public sealed class TodosControllerTests
         var item = await AddItemAsync();
         var controller = CreateController(new DeletedBeforeUpdateRepository(_repository));
 
-        var result = await controller.Update(item.Id, new UpdateTodoItemRequest { Title = "Úkol" }, CancellationToken.None);
+        var result = await controller.Update(item.Id, new UpdateTodoItemRequest { Title = "Úkol", Version = item.Version }, CancellationToken.None);
 
         AssertNotFoundProblem(result.Result, item.Id);
     }
