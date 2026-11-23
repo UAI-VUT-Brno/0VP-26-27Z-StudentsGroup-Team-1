@@ -103,8 +103,10 @@ public sealed class JsonFileTodoStoreTests : IDisposable
         // Soubor uložený před zavedením verzí pole version nemá – úkoly se musí načíst dál.
         WriteFile("""[{"id": "0f8fad5b-d9cb-469f-a165-70867728950e", "userId": "jan.novak", "title": "Starý úkol", "createdAtUtc": "2026-10-26T12:00:00Z"}]""");
 
-        var loaded = Assert.Single(CreateStore().Load()!);
+        var items = CreateStore().Load();
 
+        Assert.NotNull(items);
+        var loaded = Assert.Single(items);
         Assert.Equal("Starý úkol", loaded.Title);
         Assert.Equal(1, loaded.Version);
     }
