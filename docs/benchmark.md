@@ -62,13 +62,36 @@ Fill one row per run. Link the timestamped event log or recording, the first and
 
 | Case | Approach | Tools and model | Start/end UTC and elapsed time | Human interventions | First attempt | Repair cycles | Final tests (passed/failed/skipped) | PR and result | Review and evidence |
 | --- | --- | --- | --- | ---: | --- | --- | --- | --- | --- |
-| Historical | A — Copilot | — | — | — | — | — | — | — | — |
-| Historical | B — /issue-to-pr | — | — | — | — | — | — | — | — |
-| Synthetic | A — Copilot | — | — | — | — | — | — | — | — |
-| Synthetic | B — /issue-to-pr | — | — | — | — | — | — | — | — |
+| Historical | A — Copilot | VS Code 1.147.0, Copilot Free, Chat (Ask), Copilot Fusion → `gpt-6-luna` | 2026-11-23 07:46:17–08:31:11, 44 min 54 s | ≥ 33 | no (build error) | ≥ 3 | 258 / 39 / 2 | [#58](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/pull/58), draft, stopped by the runner, CI fails | [run record](benchmark/runs/53-A.md) |
+| Historical | B — /issue-to-pr | Claude Code 2.1.330, `claude-opus-5-5` (effort xhigh), permission mode default, pack `fbff347` | 2026-11-23 08:42:05–09:06:22, 24 min 17 s | 0 | yes | 0 | 345 / 0 / 2 | [#59](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/pull/59), ready, CI green | [run record](benchmark/runs/53-B.md), [transcript](benchmark/runs/53-B/transcript/) |
+| Synthetic | A — Copilot | VS Code 1.147.0, Copilot Free, Chat (Ask), Copilot Fusion → `gpt-6-luna` | 2026-11-23 09:19:52–09:47:33, 27 min 41 s | ≥ 18 | no (build error) | 0 | did not build | [#60](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/pull/60), draft, stopped by the runner, CI fails | [run record](benchmark/runs/54-A.md) |
+| Synthetic | B — /issue-to-pr | Claude Code 2.1.330, `claude-opus-5-5` (effort xhigh), permission mode default, pack `fbff347` | 2026-11-23 09:52:33–10:33:21, 40 min 48 s | 0 until the PR existed, then 1 (`continue` after the plan's usage limit) | no | 1 | 393 / 0 / 2 | [#61](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/pull/61), ready, CI green | [run record](benchmark/runs/54-B.md), [transcript](benchmark/runs/54-B/transcript/) |
+
+The runs followed the protocol at commit `36a8634` (PR #57, not merged yet at run time). A runs kept timestamped notes instead of a screen recording; their counts are lower bounds reconstructed from the Copilot chat export, the terminal history and the final diff. Both A runs were stopped by the runner without green tests, and their PRs are drafts. The run PRs stay open as evidence and must not be merged.
+
+### Code review
+
+Same checklist for all four PRs. `dotnet format --verify-no-changes` is compared with the baseline of the matching base (55 findings on `base-t1-10`, 101 on `base-synthetic`), so only findings a run adds count against it.
+
+| Item | #58 (53 A) | #59 (53 B) | #60 (54 A) | #61 (54 B) |
+| --- | --- | --- | --- | --- |
+| Format vs. baseline | pass: 55, no new findings | pass: 28, fixes whitespace in touched files | pass: 101, no new findings | pass: 30, fixes whitespace in touched files |
+| Layering, persistence, multi-instance | pass: DTO, Data and API changes in their layers; legacy JSON without `userId` loads | pass: one commit per layer; legacy file test survives a write | fail: version check moved into the repository as designed, but a caller was not updated and the solution does not build | pass: version check and write inside the JSON file lock; multi-instance integration test |
+| Errors (ProblemDetails, status codes) | pass: `400` validation for `userId`, but existing tests were not updated to send it | pass: `400` validation for `userId` | not applicable: does not build | pass: `409` ProblemDetails for stale writes, `400` for missing or invalid versions |
+| Tests cover the acceptance criteria; suite passes | fail: 39 failures, docs not updated | pass: 345/347, docs and OpenAPI updated | fail: no test ran | pass: 393/395, docs and OpenAPI updated |
 
 ### Failure and edge-case log
 
 | Run and UTC time | Stage | Observation and impact | Resolution or stop reason | Evidence |
 | --- | --- | --- | --- | --- |
-| — | — | — | — | — |
+| 53 A, 07:47 | prompt 1 | Copilot fetched the repository's issue search for `userId`, whose results list PR #29 (the original solution). It did not open it, but it is a leakage path for the historical case. | Logged as a threat to validity | `53-A` chat export |
+| 53 A, 07:50–08:08 | edits | Ask mode returns fragments without placement; Apply in Editor merged a `Clone()` fragment into `TodoItemDto.cs` and caused a compile error. Several of the twelve prompts only asked where code belongs. | Fixed by hand | [53-A](benchmark/runs/53-A.md) |
+| 53 A, 08:10–08:29 | test | Making `userId` required broke about 40 existing tests whose fixtures send no owner. Copilot described the fixture changes in prose across 10+ files. | Runner stopped at 39 failures | [53-A](benchmark/runs/53-A.md) |
+| 53 A, 08:05 | test | Copilot suggested a filtered Debug `dotnet test`; the first-attempt metric therefore comes from a filtered run. | Logged | [53-A](benchmark/runs/53-A.md) |
+| 53 B, whole run | plan | Threat to validity: the pack's rules and prompts were written after `main` had `userId` and mention it (`csharp-style.md`, `testing.md`, `repair-diagnostics.md`). | Logged; pack used unchanged as pinned | [53-B](benchmark/runs/53-B.md) |
+| 53 B, 08:58 | implement | The implementer read a file that does not exist (`DataServiceCollectionExtensions.cs`). | Recovered by itself | 53-B transcript |
+| 53 B, 54 B | implement | `dotnet format whitespace` on touched files also fixed pre-existing whitespace, which adds diff noise. | Accepted | PR #59, #61 |
+| 54 A, 09:31–09:46 | implement | Copilot's design changed the `ITodoRepository` signatures; every caller and test double had to be updated by hand. One missed call (CS1503) broke the build; new types had no XML docs (CS1591). | Runner stopped at the first failed build | [54-A](benchmark/runs/54-A.md) |
+| 54 B, 10:25–10:28 | verify | First test run failed: new tests expected `application/problem+json`, the controllers return `application/json`. QA fixed the tests it had added and kept every assertion. | 1 repair cycle, then green | [54-B](benchmark/runs/54-B.md) |
+| 54 B, 10:33–12:00 | summary | The Claude Pro 5-hour usage limit ran out after the PR existed; the session paused until the runner typed `continue`. | 1 intervention, outside the timed window | 54-B transcript |
+| all runs | setup | Claude Code updated itself from 2.1.326 to 2.1.330 between creating the 53 B clone and the run; both B runs used 2.1.330. The notes window (`Read-Host`) could not take pasted text. | Versions recorded from the transcripts | run records |
