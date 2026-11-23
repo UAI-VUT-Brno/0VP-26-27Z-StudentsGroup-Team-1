@@ -1,3 +1,6 @@
 # Shellové skripty musí mít LF i po checkoutu na Windows.
 *.sh text eol=lf
 docs/report/issue-to-pr-report.pdf binary
+
+# Záznamy a přepisy běhů benchmarku – v diffech a statistikách jazyků je skryjeme.
+docs/benchmark/runs/** linguist-generated=true

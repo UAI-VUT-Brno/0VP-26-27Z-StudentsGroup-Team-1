@@ -27,10 +27,10 @@ Both skips are existing opt-in load tests.
 
 ## Run procedure
 
-Use the protocol revision recorded with the evidence. For B, pin a complete revision of the orchestrator, rules, subagents and prompts. For each case, complete A before starting B. Use an independent fresh clone per run, start on the base branch shown above, and confirm that `git rev-parse HEAD` matches the pinned commit and `git status --porcelain` is empty. Use the same issue text, machine, .NET SDK and environment for both approaches. Record any deviations with the result. Capture tool versions and the selected model in each run. Use the same package-cache policy across all four runs.
+Start after the benchmark protocol is merged. Approach B also requires the merged orchestrator, rules, subagents and prompts. For each case, complete A before opening B's solution. Use an independent fresh clone per run, start on the base branch shown above, and confirm that `git rev-parse HEAD` matches the pinned commit and `git status --porcelain` is empty. Use the same issue text, machine, .NET SDK and environment for both approaches. Record any deviations with the result. Capture tool versions and the selected model in each run. Use the same package-cache policy across all four runs.
 
 - **A — Interactive GitHub Copilot in VS Code.** Use inline completions, Copilot Chat with workspace context (`@workspace`), and manual debugging. Use a distinct working branch such as `benchmark/copilot-53` or `benchmark/copilot-54` and open the PR against the case's base. Capture the screen or keep timestamped notes of prompts, edits, commands and test outcomes. Record VS Code, Copilot and model versions or identifiers.
-- **B — Claude Code `/issue-to-pr`.** Take the complete `.claude/skills/issue-to-pr/` pack and `.claude/settings.json` from the pinned workflow commit. Copy those files into each B clone at their expected paths before timing, and locally exclude `/.claude/` and `/.issue-to-pr/` in that clone's `.git/info/exclude`. Record the workflow commit. Verify the working tree is clean, `gh auth status` succeeds, Claude Code is signed in, the workspace is trusted, and the plugin and its four agents are available. Start the screen recording and enter the single command below. Leave the session untouched until it finishes. Export the transcript and preserve `.issue-to-pr/<issue>/run.md` along with the PR link. Record Claude Code, GitHub CLI and model versions or identifiers.
+- **B — Claude Code `/issue-to-pr`.** Take the complete `.claude/skills/issue-to-pr/` pack and `.claude/settings.json` from one pinned commit containing the merged workflow. Neither benchmark base contains the pack. Copy those files into each B clone at their expected paths before timing, and locally exclude `/.claude/` and `/.issue-to-pr/` in that clone's `.git/info/exclude`. Record the workflow commit. Verify the working tree is clean, `gh auth status` succeeds, the plugin and its four agents are available, and workspace trust is already set. Start the screen recording and enter the single command below. Leave the session untouched until it finishes. Export the transcript and preserve `.issue-to-pr/<issue>/run.md` along with the PR link. Record Claude Code, GitHub CLI and model versions or identifiers.
 
 ```text
 /issue-to-pr #53 --base benchmark/base-t1-10
@@ -60,26 +60,49 @@ Use **pass**, **fail**, or **not applicable** with a short reason for every item
 
 Fill one row per run. Link the timestamped event log or recording, the first and final test outputs, and the completed review. Put any screenshots under `docs/img/`.
 
-**Status on 2026-11-18.** The four trials are pending at preflight. A dash marks an unmeasured value.
-
 | Case | Approach | Tools and model | Start/end UTC and elapsed time | Human interventions | First attempt | Repair cycles | Final tests (passed/failed/skipped) | PR and result | Review and evidence |
 | --- | --- | --- | --- | ---: | --- | --- | --- | --- | --- |
-| Historical | A — Copilot | VS Code 1.110.1, Copilot Chat 0.38.2 | — | — | — | — | — | Sign-in and trust pending | Preflight below |
-| Historical | B — /issue-to-pr | Claude Code 2.1.327, GitHub CLI 2.105.0 | — | — | — | — | — | Sign-in, trust and A pending | Preflight below |
-| Synthetic | A — Copilot | VS Code 1.110.1, Copilot Chat 0.38.2 | — | — | — | — | — | Sign-in and trust pending | Preflight below |
-| Synthetic | B — /issue-to-pr | Claude Code 2.1.327, GitHub CLI 2.105.0 | — | — | — | — | — | Sign-in, trust and A pending | Preflight below |
+| Historical | A — Copilot | VS Code 1.147.0, Copilot Free, Chat (Ask), Copilot Fusion → `gpt-6-luna` | 2026-11-23 07:46:17–08:31:11, 44 min 54 s | ≥ 33 | no (build error) | ≥ 3 | 258 / 39 / 2 | [#58](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/pull/58), draft, stopped by the runner, CI fails | [run record](benchmark/runs/53-A.md) |
+| Historical | B — /issue-to-pr | Claude Code 2.1.330, `claude-opus-5-5` (effort xhigh), permission mode default, pack `fbff347` | 2026-11-23 08:42:05–09:06:22, 24 min 17 s | 0 | yes | 0 | 345 / 0 / 2 | [#59](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/pull/59), ready, CI green | [run record](benchmark/runs/53-B.md), [transcript](benchmark/runs/53-B/transcript/) |
+| Synthetic | A — Copilot | VS Code 1.147.0, Copilot Free, Chat (Ask), Copilot Fusion → `gpt-6-luna` | 2026-11-23 09:19:52–09:47:33, 27 min 41 s | ≥ 18 | no (build error) | 0 | did not build | [#60](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/pull/60), draft, stopped by the runner, CI fails | [run record](benchmark/runs/54-A.md) |
+| Synthetic | B — /issue-to-pr | Claude Code 2.1.330, `claude-opus-5-5` (effort xhigh), permission mode default, pack `fbff347` | 2026-11-23 09:52:33–10:33:21, 40 min 48 s | 0 until the PR existed, then 1 (`continue` after the plan's usage limit) | no | 1 | 393 / 0 / 2 | [#61](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/pull/61), ready, build-and-test green, CodeQL: 1 high alert (pre-existing unauthenticated `Delete`, flagged again) | [run record](benchmark/runs/54-B.md), [transcript](benchmark/runs/54-B/transcript/) |
 
-### Execution preflight
+The runs followed the protocol at commit `36a8634` (PR #57, not merged yet at run time). No run was screen-recorded: A runs kept timestamped notes, and their counts are lower bounds reconstructed from the Copilot chat export, the terminal history and the final diff; B runs are documented by their session transcripts. No screenshots were taken; the transcripts and chat exports replace them. Both A runs were stopped by the runner without green tests, and their PRs are drafts. The run PRs stay open as evidence and must not be merged.
 
-- **Protocol:** setup commit `6a6d077234086b77b5da70001a4bddb7704e50dc` and this execution update.
-- **Source:** four fresh clones matched the case SHAs above and had empty `git status --porcelain` output. Both Claude Code clones remained clean after the workflow and run directory were excluded locally.
-- **Workflow:** [`ecaf1bf582858d40d7820c14ec37718b0e130d50`](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/commit/ecaf1bf582858d40d7820c14ec37718b0e130d50) includes the orchestrator, rules and prompt library. `claude plugin validate <pack> --strict` passed and identified the skill and all four agents.
-- **GitHub:** GitHub CLI authenticated using the existing repository credential and reported both fixtures open with the `benchmark` label.
-- **Models:** selection and identifiers are pending authenticated sessions. Start the timer only when the runner first opens the fixture for a trial.
+**Elapsed time compares different end states.** For A it is the time to a draft PR that is not green (stopped by the runner); for B it is the time to a PR whose Release suite passed. For example, 54-A's 27 min is not faster than 54-B's 40 min: 54-A ended without a building solution.
+
+### Limitations
+
+- **The conditions were not symmetric.** A used Copilot Free in Ask mode with an auto-selected model (`gpt-6-luna`). Ask mode cannot edit files, which explains most of A's interventions. B used `claude-opus-5-5` at effort `xhigh` on a Claude Pro plan.
+- **The protocol had no time box or stop rule.** 53-A was stopped after 45 minutes with 39 failing tests, 54-A after its first failed build (0 repair cycles). The A outcomes are therefore partly the runner's decision, not only the tool's result.
+- **The pack had hints for both cases.** Its rules were written after `main` had `userId` and optimistic concurrency was planned. `rules/concurrency.md` describes most of the #54 solution, and the 54-B plan cites it. The Copilot runs had nothing comparable.
+- **One run per cell.** No B run was repeated, so the variance between runs is unknown.
+
+### Code review
+
+Same checklist for all four PRs. `dotnet format --verify-no-changes` is compared with the baseline of the matching base (55 findings on `base-t1-10`, 101 on `base-synthetic`), so only findings a run adds count against it.
+
+| Item | #58 (53 A) | #59 (53 B) | #60 (54 A) | #61 (54 B) |
+| --- | --- | --- | --- | --- |
+| Format vs. baseline | pass: 55, no new findings | pass: 28, fixes whitespace in touched files | pass: 101, no new findings | pass: 30, fixes whitespace in touched files |
+| Layering, persistence, multi-instance | pass: DTO, Data and API changes in their layers; legacy JSON without `userId` loads | pass: one commit per layer; legacy file test survives a write | fail: version check moved into the repository as designed, but a caller was not updated and the solution does not build | pass: version check and write inside the JSON file lock; multi-instance integration test |
+| Errors (ProblemDetails, status codes) | pass: `400` validation for `userId`, but existing tests were not updated to send it | pass: `400` validation for `userId` | not applicable: does not build | pass: `409` ProblemDetails for stale writes, `400` for missing or invalid versions |
+| Tests cover the acceptance criteria; suite passes | fail: 39 failures, docs not updated | pass: 345/347, docs and OpenAPI updated | fail: no test ran | pass: 393/395, docs and OpenAPI updated |
 
 ### Failure and edge-case log
 
 | Run and UTC time | Stage | Observation and impact | Resolution or stop reason | Evidence |
 | --- | --- | --- | --- | --- |
-| A preflight, 2026-11-18 | IDE setup | The historical clone opened in VS Code Restricted Mode. The chat UI requested sign-in and showed Copilot disabled. | Trust the fixture workspace and sign in to Copilot before timing. | VS Code workspace and chat status |
-| B preflight, 2026-11-18 | Authentication and discovery | `claude auth status --text` reported no login. `claude plugin list --json` reported a suppressed project skill directory in both clones, and `claude agents --json` returned an empty list in both. | Sign in, trust each clone and relaunch or reload the plugin before timing. | Claude Code auth, plugin and agent commands |
+| 53 A, 07:47 | prompt 1 | Copilot fetched the repository's issue search for `userId`, whose results list PR #29 (the original solution). It did not open it, but it is a leakage path for the historical case. | Logged as a threat to validity | `53-A` chat export |
+| 53 A, 07:50–08:08 | edits | Ask mode returns fragments without placement; Apply in Editor merged a `Clone()` fragment into `TodoItemDto.cs` and caused a compile error. Several of the twelve prompts only asked where code belongs. | Fixed by hand | [53-A](benchmark/runs/53-A.md) |
+| 53 A, 08:10–08:29 | test | Making `userId` required broke about 40 existing tests whose fixtures send no owner. Copilot described the fixture changes in prose across 10+ files. | Runner stopped at 39 failures | [53-A](benchmark/runs/53-A.md) |
+| 53 A, 08:05 | test | Copilot suggested a filtered Debug `dotnet test`; the first-attempt metric therefore comes from a filtered run. | Logged | [53-A](benchmark/runs/53-A.md) |
+| 53 B, whole run | plan | Threat to validity: the pack's rules and prompts were written after `main` had `userId` and mention it (`csharp-style.md`, `testing.md`, `repair-diagnostics.md`). | Logged; pack used unchanged as pinned | [53-B](benchmark/runs/53-B.md) |
+| 53 B, 08:58 | implement | The implementer read a file that does not exist (`DataServiceCollectionExtensions.cs`). | Recovered by itself | 53-B transcript |
+| 53 B, 54 B | implement | `dotnet format whitespace` on touched files also fixed pre-existing whitespace, which adds diff noise. | Accepted | PR #59, #61 |
+| 54 A, 09:31–09:46 | implement | Copilot's design changed the `ITodoRepository` signatures; every caller and test double had to be updated by hand. One missed call (CS1503) broke the build; new types had no XML docs (CS1591). | Runner stopped at the first failed build | [54-A](benchmark/runs/54-A.md) |
+| 54 B, 10:25–10:28 | verify | First test run failed: new tests expected `application/problem+json`, the controllers return `application/json`. QA fixed the tests it had added and kept every assertion. | 1 repair cycle, then green | [54-B](benchmark/runs/54-B.md) |
+| 54 B, whole run | plan | Threat to validity, stronger than for 53 B: `rules/concurrency.md` spells out most of the #54 solution (`version` in the PUT body and the DELETE query, `409` ProblemDetails, the check inside the repository write, old files loading as version 1, and the test list). The 54-B plan cites it directly. | Logged; pack used unchanged as pinned | [54-B](benchmark/runs/54-B.md), `54-B/run/plan.md` |
+| 54 B, CI of #61 | release | CodeQL reports 1 new high alert, *Missing function level access control* on `TodosController.Delete`. The action existed before; it counts as new because its signature gained the `version` query parameter. The API has no authentication by design, so it is effectively a false positive. #60's CodeQL also fails, because it does not build. | Logged; not fixed in the run PR | PR #61 checks |
+| 54 B, 10:33–12:00 | summary | The Claude Pro 5-hour usage limit ran out after the PR existed; the session paused until the runner typed `continue`. | 1 intervention, outside the timed window | 54-B transcript |
+| all runs | setup | Claude Code updated itself from 2.1.326 to 2.1.330 between creating the 53 B clone and the run; both B runs used 2.1.330. The notes window (`Read-Host`) could not take pasted text. | Versions recorded from the transcripts | run records |
