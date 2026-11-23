@@ -59,6 +59,7 @@ public sealed class JsonFileTodoStoreTests : IDisposable
 
     // --- Uložení a načtení --------------------------------------------------
 
+    // AC 1: Verze se uloží a načte spolu s ostatními poli.
     [Fact]
     public void SaveThenLoad_ReturnsAllFields()
     {
@@ -73,7 +74,8 @@ public sealed class JsonFileTodoStoreTests : IDisposable
             DueAtUtc = Now.AddDays(7),
             CreatedAtUtc = Now.AddDays(-1),
             CompletedAtUtc = Now,
-            UpdatedAtUtc = Now
+            UpdatedAtUtc = Now,
+            Version = 3
         };
 
         CreateStore().Save([item]);
@@ -92,6 +94,19 @@ public sealed class JsonFileTodoStoreTests : IDisposable
 
         Assert.Equal("Starý úkol", loaded.Title);
         Assert.Null(loaded.UserId);
+    }
+
+    // AC 1, AC 5: Starý soubor bez verzí se načte a jeho úkoly mají verzi 1.
+    [Fact]
+    public void Load_FileFromBeforeVersions_LoadsTasksWithVersionOne()
+    {
+        // Soubor uložený před zavedením verzí pole version nemá – úkoly se musí načíst dál.
+        WriteFile("""[{"id": "0f8fad5b-d9cb-469f-a165-70867728950e", "userId": "jan.novak", "title": "Starý úkol", "createdAtUtc": "2026-10-26T12:00:00Z"}]""");
+
+        var loaded = Assert.Single(CreateStore().Load()!);
+
+        Assert.Equal("Starý úkol", loaded.Title);
+        Assert.Equal(1, loaded.Version);
     }
 
     [Fact]
@@ -148,6 +163,19 @@ public sealed class JsonFileTodoStoreTests : IDisposable
         // Stejné konvence jako API – soubor se dá prohlédnout i opravit ručně.
         Assert.Contains("\"title\": \"Úkol\"", json);
         Assert.Contains("\"priority\": \"High\"", json);
+    }
+
+    // AC 1: Verze se do souboru zapisuje, aby ji po restartu viděly všechny instance.
+    [Fact]
+    public void Save_WritesVersion()
+    {
+        var item = CreateItem();
+        item.Version = 5;
+
+        CreateStore().Save([item]);
+        var json = File.ReadAllText(FilePath);
+
+        Assert.Contains("\"version\": 5", json);
     }
 
     [Fact]

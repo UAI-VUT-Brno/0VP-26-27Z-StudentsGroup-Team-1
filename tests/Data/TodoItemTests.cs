@@ -23,7 +23,8 @@ public sealed class TodoItemTests
         DueAtUtc = CreatedAt.AddDays(7),
         CreatedAtUtc = CreatedAt,
         CompletedAtUtc = CreatedAt.AddHours(2),
-        UpdatedAtUtc = CreatedAt.AddHours(3)
+        UpdatedAtUtc = CreatedAt.AddHours(3),
+        Version = 4
     };
 
     [Fact]
@@ -114,5 +115,19 @@ public sealed class TodoItemTests
         Assert.Null(clone.Description);
         Assert.Null(clone.DueAtUtc);
         Assert.Null(clone.CompletedAtUtc);
+    }
+
+    // AC 5: Nové úkoly začínají ve verzi 1.
+    [Fact]
+    public void NewItem_WithoutVersion_StartsAtVersionOne()
+    {
+        var item = new TodoItem
+        {
+            Id = Guid.NewGuid(),
+            Title = "Nový úkol",
+            CreatedAtUtc = CreatedAt
+        };
+
+        Assert.Equal(1, item.Version);
     }
 }

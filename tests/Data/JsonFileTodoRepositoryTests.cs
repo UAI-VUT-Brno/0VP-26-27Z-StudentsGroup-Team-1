@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging.Testing;
+using UAI.ZeroVP.Data.Abstractions;
 using UAI.ZeroVP.Data.Entities;
 using UAI.ZeroVP.Data.InMemory;
 using UAI.ZeroVP.Data.JsonFile;
@@ -95,6 +96,117 @@ public sealed class JsonFileTodoRepositoryTests : IDisposable
             }));
 
         Assert.Equal(2 * tasksPerInstance, await CreateRepository().CountAsync());
+    }
+
+    // --- Kontrola verze mezi instancemi -------------------------------------
+
+    // AC 2, AC 3, AC 4: Zápis přes jednu instanci zneplatní verzi, kterou drží druhá.
+    [Fact]
+    public async Task UpdateIfVersionMatches_ThroughOneInstance_MakesVersionStaleOnAnother()
+    {
+        var instanceA = CreateRepository();
+        var instanceB = CreateRepository();
+        var item = CreateItem("Původní");
+        await instanceA.AddAsync(item);
+        var readByB = await instanceB.GetByIdAsync(item.Id);
+        Assert.NotNull(readByB);
+        Assert.Equal(1, readByB.Version);
+
+        var fromA = item.Clone();
+        fromA.Title = "Z instance A";
+        var resultA = await instanceA.UpdateIfVersionMatchesAsync(fromA, expectedVersion: 1);
+
+        readByB.Title = "Z instance B";
+        var resultB = await instanceB.UpdateIfVersionMatchesAsync(readByB, expectedVersion: readByB.Version);
+
+        Assert.Equal(TodoWriteStatus.Success, resultA.Status);
+        Assert.Equal(TodoWriteStatus.Conflict, resultB.Status);
+        Assert.NotNull(resultB.Item);
+        Assert.Equal(2, resultB.Item.Version);
+        var stored = await CreateRepository().GetByIdAsync(item.Id);
+        Assert.NotNull(stored);
+        Assert.Equal("Z instance A", stored.Title);
+        Assert.Equal(2, stored.Version);
+    }
+
+    // AC 3: Smazání se zastaralou verzí úkol v souboru ponechá.
+    [Fact]
+    public async Task DeleteIfVersionMatches_StaleVersion_KeepsTaskInFile()
+    {
+        var instanceA = CreateRepository();
+        var instanceB = CreateRepository();
+        var item = CreateItem("Původní");
+        await instanceA.AddAsync(item);
+        item.Title = "Novější";
+        await instanceA.UpdateIfVersionMatchesAsync(item, expectedVersion: 1);
+
+        var result = await instanceB.DeleteIfVersionMatchesAsync(item.Id, expectedVersion: 1);
+
+        Assert.Equal(TodoWriteStatus.Conflict, result.Status);
+        var stored = await CreateRepository().GetByIdAsync(item.Id);
+        Assert.NotNull(stored);
+        Assert.Equal("Novější", stored.Title);
+        Assert.Equal(2, stored.Version);
+    }
+
+    // AC 2: Smazání se shodnou verzí úkol ze souboru odstraní.
+    [Fact]
+    public async Task DeleteIfVersionMatches_MatchingVersion_RemovesTaskFromFile()
+    {
+        var instanceA = CreateRepository();
+        var instanceB = CreateRepository();
+        var item = CreateItem();
+        await instanceA.AddAsync(item);
+
+        var result = await instanceB.DeleteIfVersionMatchesAsync(item.Id, expectedVersion: 1);
+
+        Assert.Equal(TodoWriteStatus.Success, result.Status);
+        Assert.Empty(await CreateRepository().GetAllAsync());
+    }
+
+    // AC 6: Platná verze u neexistujícího úkolu vrátí NotFound a nic nepřidá.
+    [Fact]
+    public async Task UpdateIfVersionMatches_UnknownItem_ReturnsNotFound()
+    {
+        var repository = CreateRepository();
+
+        var result = await repository.UpdateIfVersionMatchesAsync(CreateItem(), expectedVersion: 1);
+
+        Assert.Equal(TodoWriteStatus.NotFound, result.Status);
+        Assert.Equal(0, await CreateRepository().CountAsync());
+    }
+
+    // AC 7: Ze souběžných zápisů se stejnou verzí ze dvou instancí projde právě jeden.
+    [Fact]
+    public async Task ConcurrentUpdatesWithSameVersion_FromTwoInstances_ExactlyOneSucceeds()
+    {
+        const int updatesPerInstance = 10;
+        var instanceA = CreateRepository();
+        var instanceB = CreateRepository();
+        var item = CreateItem();
+        await instanceA.AddAsync(item);
+
+        // Obě instance zapisují současně se stejnou verzí 1. Kontrola a zápis běží pod jedním
+        // zámkem souboru, takže první zápis verzi zvýší a všechny ostatní uvidí konflikt.
+        var results = await Task.WhenAll(
+            Enumerable.Range(0, updatesPerInstance).SelectMany(i => new[]
+            {
+                Task.Run(() => instanceA.UpdateIfVersionMatchesAsync(WithTitle(item, $"A {i}"), expectedVersion: 1)),
+                Task.Run(() => instanceB.UpdateIfVersionMatchesAsync(WithTitle(item, $"B {i}"), expectedVersion: 1))
+            }));
+
+        Assert.Single(results, result => result.Status == TodoWriteStatus.Success);
+        Assert.Equal(2 * updatesPerInstance - 1, results.Count(result => result.Status == TodoWriteStatus.Conflict));
+        var stored = await CreateRepository().GetByIdAsync(item.Id);
+        Assert.NotNull(stored);
+        Assert.Equal(2, stored.Version);
+    }
+
+    private static TodoItem WithTitle(TodoItem item, string title)
+    {
+        var copy = item.Clone();
+        copy.Title = title;
+        return copy;
     }
 
     // --- Chybějící soubor ---------------------------------------------------

@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Time.Testing;
+using UAI.ZeroVP.Data.Abstractions;
 using UAI.ZeroVP.Data.Entities;
 using UAI.ZeroVP.Data.InMemory;
 using UAI.ZeroVP.DTO;
@@ -24,16 +25,24 @@ public sealed class InMemoryTodoRepositoryTests
         DateTimeOffset? createdAtUtc = null,
         DateTimeOffset? dueAtUtc = null,
         string? userId = null) => new()
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Title = title,
+            Priority = priority,
+            IsCompleted = isCompleted,
+            DueAtUtc = dueAtUtc,
+            CreatedAtUtc = createdAtUtc ?? Now,
+            UpdatedAtUtc = createdAtUtc ?? Now
+        };
+
+    /// <summary>Ověří výsledek zápisu s kontrolou verze a vrátí úkol, který nese.</summary>
+    private static TodoItem AssertWriteResult(TodoWriteResult result, TodoWriteStatus expectedStatus)
     {
-        Id = Guid.NewGuid(),
-        UserId = userId,
-        Title = title,
-        Priority = priority,
-        IsCompleted = isCompleted,
-        DueAtUtc = dueAtUtc,
-        CreatedAtUtc = createdAtUtc ?? Now,
-        UpdatedAtUtc = createdAtUtc ?? Now
-    };
+        Assert.Equal(expectedStatus, result.Status);
+        Assert.NotNull(result.Item);
+        return result.Item;
+    }
 
     // --- Ukázková data ------------------------------------------------------
 
@@ -178,7 +187,22 @@ public sealed class InMemoryTodoRepositoryTests
 
         await Assert.ThrowsAsync<ArgumentNullException>(() => repository.AddAsync(null!));
     }
-    
+
+    // AC 5: Nové úkoly začínají ve verzi 1.
+    [Fact]
+    public async Task AddAsync_NewItem_StartsAtVersionOne()
+    {
+        var repository = CreateEmptyRepository();
+        var item = CreateItem();
+
+        var returned = await repository.AddAsync(item);
+
+        Assert.Equal(1, returned.Version);
+        var stored = await repository.GetByIdAsync(item.Id);
+        Assert.NotNull(stored);
+        Assert.Equal(1, stored.Version);
+    }
+
     // --- Přidání více úkolů najednou ----------------------------------------
 
     [Fact]
@@ -340,57 +364,57 @@ public sealed class InMemoryTodoRepositoryTests
         Assert.Equal(isCompleted, item.IsCompleted);
     }
 
-[Fact]
-public async Task GetAllAsync_UserFilter_ReturnsOnlyMatchingUser()
-{
-    var repository = CreateEmptyRepository();
-    await repository.AddAsync(CreateItem("Alice", userId: "alice"));
-    await repository.AddAsync(CreateItem("Bob", userId: "bob"));
+    [Fact]
+    public async Task GetAllAsync_UserFilter_ReturnsOnlyMatchingUser()
+    {
+        var repository = CreateEmptyRepository();
+        await repository.AddAsync(CreateItem("Alice", userId: "alice"));
+        await repository.AddAsync(CreateItem("Bob", userId: "bob"));
 
-    var items = await repository.GetAllAsync(userId: "alice");
+        var items = await repository.GetAllAsync(userId: "alice");
 
-    var item = Assert.Single(items);
-    Assert.Equal("Alice", item.Title);
-    Assert.Equal("alice", item.UserId);
-}
+        var item = Assert.Single(items);
+        Assert.Equal("Alice", item.Title);
+        Assert.Equal("alice", item.UserId);
+    }
 
-[Fact]
-public async Task GetAllAsync_UserAndCompletionFilters_ReturnOnlyMatchingItems()
-{
-    var repository = CreateEmptyRepository();
-    await repository.AddAsync(CreateItem("Alice hotovo", isCompleted: true, userId: "alice"));
-    await repository.AddAsync(CreateItem("Alice rozdělané", isCompleted: false, userId: "alice"));
-    await repository.AddAsync(CreateItem("Bob rozdělané", isCompleted: false, userId: "bob"));
+    [Fact]
+    public async Task GetAllAsync_UserAndCompletionFilters_ReturnOnlyMatchingItems()
+    {
+        var repository = CreateEmptyRepository();
+        await repository.AddAsync(CreateItem("Alice hotovo", isCompleted: true, userId: "alice"));
+        await repository.AddAsync(CreateItem("Alice rozdělané", isCompleted: false, userId: "alice"));
+        await repository.AddAsync(CreateItem("Bob rozdělané", isCompleted: false, userId: "bob"));
 
-    var items = await repository.GetAllAsync(userId: "alice", isCompleted: false);
+        var items = await repository.GetAllAsync(userId: "alice", isCompleted: false);
 
-    var item = Assert.Single(items);
-    Assert.Equal("Alice rozdělané", item.Title);
-    Assert.Equal("alice", item.UserId);
-    Assert.False(item.IsCompleted);
-}
+        var item = Assert.Single(items);
+        Assert.Equal("Alice rozdělané", item.Title);
+        Assert.Equal("alice", item.UserId);
+        Assert.False(item.IsCompleted);
+    }
 
-[Fact]
-public async Task GetAllAsync_UnknownUser_ReturnsEmptyList()
-{
-    var repository = CreateEmptyRepository();
-    await repository.AddAsync(CreateItem("Alice", userId: "alice"));
+    [Fact]
+    public async Task GetAllAsync_UnknownUser_ReturnsEmptyList()
+    {
+        var repository = CreateEmptyRepository();
+        await repository.AddAsync(CreateItem("Alice", userId: "alice"));
 
-    var items = await repository.GetAllAsync(userId: "nobody");
+        var items = await repository.GetAllAsync(userId: "nobody");
 
-    Assert.Empty(items);
-}
+        Assert.Empty(items);
+    }
 
-[Fact]
-public async Task GetAllAsync_UserFilter_IsCaseSensitive()
-{
-    var repository = CreateEmptyRepository();
-    await repository.AddAsync(CreateItem("Alice", userId: "alice"));
+    [Fact]
+    public async Task GetAllAsync_UserFilter_IsCaseSensitive()
+    {
+        var repository = CreateEmptyRepository();
+        await repository.AddAsync(CreateItem("Alice", userId: "alice"));
 
-    var items = await repository.GetAllAsync(userId: "Alice");
+        var items = await repository.GetAllAsync(userId: "Alice");
 
-    Assert.Empty(items);
-}
+        Assert.Empty(items);
+    }
 
     [Fact]
     public async Task GetAllAsync_SortsByPriorityDescendingThenByCreationTime()
@@ -491,6 +515,153 @@ public async Task GetAllAsync_UserFilter_IsCaseSensitive()
         Assert.All(results, Assert.True);
     }
 
+    // AC 9: Každý úspěšný zápis zvýší verzi, i ten bez kontroly verze.
+    [Fact]
+    public async Task UpdateAsync_ExistingItem_IncrementsVersion()
+    {
+        var repository = CreateEmptyRepository();
+        var item = CreateItem();
+        await repository.AddAsync(item);
+
+        await repository.UpdateAsync(item);
+        await repository.UpdateAsync(item);
+
+        // Verzi počítá repozitář z uloženého stavu; verze ve vstupní instanci (1) se nebere v úvahu.
+        var stored = await repository.GetByIdAsync(item.Id);
+        Assert.NotNull(stored);
+        Assert.Equal(3, stored.Version);
+    }
+
+    // --- Aktualizace s kontrolou verze ----------------------------------------
+
+    // AC 2: Shodná verze úkol aktualizuje a verzi zvýší.
+    [Fact]
+    public async Task UpdateIfVersionMatchesAsync_MatchingVersion_ReturnsSuccessAndIncrementsVersion()
+    {
+        var repository = CreateEmptyRepository();
+        var item = CreateItem("Původní");
+        await repository.AddAsync(item);
+
+        item.Title = "Nový název";
+        var returned = AssertWriteResult(
+            await repository.UpdateIfVersionMatchesAsync(item, expectedVersion: 1),
+            TodoWriteStatus.Success);
+
+        Assert.Equal("Nový název", returned.Title);
+        Assert.Equal(2, returned.Version);
+        var stored = await repository.GetByIdAsync(item.Id);
+        Assert.NotNull(stored);
+        Assert.Equal("Nový název", stored.Title);
+        Assert.Equal(2, stored.Version);
+    }
+
+    // AC 3: Zastaralá verze vrátí konflikt a uložený úkol se nezmění.
+    [Fact]
+    public async Task UpdateIfVersionMatchesAsync_StaleVersion_ReturnsConflictAndKeepsStoredItem()
+    {
+        var repository = CreateEmptyRepository();
+        var item = CreateItem("Původní");
+        await repository.AddAsync(item);
+        var newer = item.Clone();
+        newer.Title = "Novější";
+        await repository.UpdateAsync(newer);
+
+        var stale = item.Clone();
+        stale.Title = "Zastaralý";
+        var current = AssertWriteResult(
+            await repository.UpdateIfVersionMatchesAsync(stale, expectedVersion: 1),
+            TodoWriteStatus.Conflict);
+
+        Assert.Equal(2, current.Version);
+        Assert.Equal("Novější", current.Title);
+        var stored = await repository.GetByIdAsync(item.Id);
+        Assert.NotNull(stored);
+        Assert.Equal("Novější", stored.Title);
+        Assert.Equal(2, stored.Version);
+    }
+
+    // AC 3, AC 7: Dva zápisy se stejnou původní verzí – první vyhraje, druhý dostane konflikt.
+    [Fact]
+    public async Task UpdateIfVersionMatchesAsync_SameVersionTwice_FirstWinsSecondConflicts()
+    {
+        var repository = CreateEmptyRepository();
+        var item = CreateItem("Původní");
+        await repository.AddAsync(item);
+        var first = item.Clone();
+        first.Title = "První";
+        var second = item.Clone();
+        second.Title = "Druhý";
+
+        var firstResult = await repository.UpdateIfVersionMatchesAsync(first, expectedVersion: 1);
+        var secondResult = await repository.UpdateIfVersionMatchesAsync(second, expectedVersion: 1);
+
+        Assert.Equal(TodoWriteStatus.Success, firstResult.Status);
+        Assert.Equal(2, AssertWriteResult(secondResult, TodoWriteStatus.Conflict).Version);
+        var stored = await repository.GetByIdAsync(item.Id);
+        Assert.NotNull(stored);
+        Assert.Equal("První", stored.Title);
+        Assert.Equal(2, stored.Version);
+    }
+
+    // AC 7: Kontrola verze a zápis jsou jeden krok – ze souběžných zápisů se stejnou verzí projde právě jeden.
+    [Fact]
+    public async Task UpdateIfVersionMatchesAsync_ConcurrentUpdatesWithSameVersion_ExactlyOneSucceeds()
+    {
+        // Souběh nejde vynutit, test ho jen hodně zvýhodní. Kdyby se verze porovnávala mimo
+        // TryUpdate, prošlo by občas víc zápisů a verze by skončila jinde než na 2.
+        var repository = CreateEmptyRepository();
+        var item = CreateItem();
+        await repository.AddAsync(item);
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 1000).Select(i => Task.Run(() =>
+        {
+            var copy = item.Clone();
+            copy.Title = $"Verze {i}";
+            return repository.UpdateIfVersionMatchesAsync(copy, expectedVersion: 1);
+        })));
+
+        var winner = AssertWriteResult(
+            Assert.Single(results, result => result.Status == TodoWriteStatus.Success),
+            TodoWriteStatus.Success);
+        Assert.Equal(999, results.Count(result => result.Status == TodoWriteStatus.Conflict));
+        var stored = await repository.GetByIdAsync(item.Id);
+        Assert.NotNull(stored);
+        Assert.Equal(2, stored.Version);
+        Assert.Equal(winner.Title, stored.Title);
+    }
+
+    // AC 6: Platná verze u neexistujícího úkolu vrátí NotFound.
+    [Fact]
+    public async Task UpdateIfVersionMatchesAsync_UnknownItem_ReturnsNotFoundAndDoesNotAddIt()
+    {
+        var repository = CreateEmptyRepository();
+
+        var result = await repository.UpdateIfVersionMatchesAsync(CreateItem(), expectedVersion: 1);
+
+        Assert.Equal(TodoWriteStatus.NotFound, result.Status);
+        Assert.Null(result.Item);
+        Assert.Equal(0, await repository.CountAsync());
+    }
+
+    // AC 3: Neplatná (nekladná) verze se do repozitáře vůbec nedostane.
+    [Theory]
+    [InlineData(0L)]
+    [InlineData(-1L)]
+    [InlineData(long.MinValue)]
+    public async Task UpdateIfVersionMatchesAsync_NonPositiveVersion_ThrowsArgumentOutOfRange(long expectedVersion)
+    {
+        var repository = CreateEmptyRepository();
+        var item = CreateItem("Původní");
+        await repository.AddAsync(item);
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => repository.UpdateIfVersionMatchesAsync(item, expectedVersion));
+
+        var stored = await repository.GetByIdAsync(item.Id);
+        Assert.NotNull(stored);
+        Assert.Equal(1, stored.Version);
+    }
+
     // --- Mazání a počet -----------------------------------------------------
 
     [Fact]
@@ -527,8 +698,60 @@ public async Task GetAllAsync_UserFilter_IsCaseSensitive()
         Assert.Equal(1, await repository.CountAsync());
     }
 
+    // --- Mazání s kontrolou verze -------------------------------------------
+
+    // AC 2: Shodná verze úkol smaže.
+    [Fact]
+    public async Task DeleteIfVersionMatchesAsync_MatchingVersion_ReturnsSuccessAndRemovesItem()
+    {
+        var repository = CreateEmptyRepository();
+        var item = CreateItem();
+        await repository.AddAsync(item);
+
+        var removed = AssertWriteResult(
+            await repository.DeleteIfVersionMatchesAsync(item.Id, expectedVersion: 1),
+            TodoWriteStatus.Success);
+
+        Assert.Equal(item.Id, removed.Id);
+        Assert.Null(await repository.GetByIdAsync(item.Id));
+    }
+
+    // AC 3: Zastaralá verze vrátí konflikt a úkol zůstane.
+    [Fact]
+    public async Task DeleteIfVersionMatchesAsync_StaleVersion_ReturnsConflictAndKeepsItem()
+    {
+        var repository = CreateEmptyRepository();
+        var item = CreateItem("Původní");
+        await repository.AddAsync(item);
+        item.Title = "Novější";
+        await repository.UpdateAsync(item);
+
+        var current = AssertWriteResult(
+            await repository.DeleteIfVersionMatchesAsync(item.Id, expectedVersion: 1),
+            TodoWriteStatus.Conflict);
+
+        Assert.Equal(2, current.Version);
+        var stored = await repository.GetByIdAsync(item.Id);
+        Assert.NotNull(stored);
+        Assert.Equal("Novější", stored.Title);
+        Assert.Equal(2, stored.Version);
+    }
+
+    // AC 6: Platná verze u neexistujícího úkolu vrátí NotFound.
+    [Fact]
+    public async Task DeleteIfVersionMatchesAsync_UnknownId_ReturnsNotFound()
+    {
+        var repository = CreateEmptyRepository();
+
+        var result = await repository.DeleteIfVersionMatchesAsync(Guid.NewGuid(), expectedVersion: 1);
+
+        Assert.Equal(TodoWriteStatus.NotFound, result.Status);
+        Assert.Null(result.Item);
+    }
+
     // --- Zrušení operace ----------------------------------------------------
 
+    // AC 2: I zápisy s kontrolou verze respektují zrušení operace.
     public static TheoryData<string, Func<InMemoryTodoRepository, CancellationToken, Task>> AllOperations => new()
     {
         { "GetAll", (repository, token) => repository.GetAllAsync(cancellationToken: token) },
@@ -536,7 +759,9 @@ public async Task GetAllAsync_UserFilter_IsCaseSensitive()
         { "Add", (repository, token) => repository.AddAsync(CreateItem(), token) },
         { "AddRange", (repository, token) => repository.AddRangeAsync([CreateItem()], token) },
         { "Update", (repository, token) => repository.UpdateAsync(CreateItem(), token) },
+        { "UpdateIfVersionMatches", (repository, token) => repository.UpdateIfVersionMatchesAsync(CreateItem(), 1, token) },
         { "Delete", (repository, token) => repository.DeleteAsync(Guid.NewGuid(), token) },
+        { "DeleteIfVersionMatches", (repository, token) => repository.DeleteIfVersionMatchesAsync(Guid.NewGuid(), 1, token) },
         { "Count", (repository, token) => repository.CountAsync(token) }
     };
 
