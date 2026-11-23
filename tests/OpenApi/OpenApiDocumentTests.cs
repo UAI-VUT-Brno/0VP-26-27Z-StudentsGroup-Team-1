@@ -24,9 +24,9 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
 {
     /// <summary>Identifikátor, který v úložišti není (ukázková data mají náhodné GUID).</summary>
     private const string MissingId = "00000000-0000-0000-0000-000000000001";
-    
+
     /// <summary>Platné tělo požadavku <c>POST /api/todos/repeat</c>.</summary>
-    private const string RepeatBody = "{\"title\":\"Týdenní report\",\"firstDueAtUtc\":\"2026-10-26T09:00:00Z\",\"repeatCount\":3}";
+    private const string RepeatBody = "{\"title\":\"Týdenní report\",\"userId\":\"jan.novak\",\"firstDueAtUtc\":\"2026-10-26T09:00:00Z\",\"repeatCount\":3}";
 
     private readonly OpenApiTestFactory _factory;
     private readonly HttpClient _client;
@@ -236,7 +236,7 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
     public async Task SuccessfulTodoLifecycle_MatchesDocument()
     {
         var document = await LoadDocumentAsync();
-        const string body = "{\"title\":\"Napsat Dockerfile\",\"priority\":\"High\"}";
+        const string body = "{\"title\":\"Napsat Dockerfile\",\"priority\":\"High\",\"userId\":\"jan.novak\"}";
 
         using var created = await SendAsync(_client, "POST", "/api/todos", body, "application/json");
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
@@ -352,7 +352,7 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
 
         public Task<TodoItem> AddAsync(TodoItem item, CancellationToken cancellationToken = default) => throw Failure();
 
-        public Task<IReadOnlyList<TodoItem>> AddRangeAsync(IEnumerable<TodoItem> items, CancellationToken cancellationToken = default) => 
+        public Task<IReadOnlyList<TodoItem>> AddRangeAsync(IEnumerable<TodoItem> items, CancellationToken cancellationToken = default) =>
             throw Failure();
 
         public Task<bool> UpdateAsync(TodoItem item, CancellationToken cancellationToken = default) => throw Failure();

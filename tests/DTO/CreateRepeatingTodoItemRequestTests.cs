@@ -1,4 +1,5 @@
-﻿using UAI.ZeroVP.DTO;
+﻿using System.Text.Json;
+using UAI.ZeroVP.DTO;
 using static UAI.ZeroVP.Tests.DTO.ValidationHelper;
 
 namespace UAI.ZeroVP.Tests.DTO;
@@ -11,9 +12,13 @@ public sealed class CreateRepeatingTodoItemRequestTests
 {
     private static readonly DateTimeOffset FirstDue = new(2026, 10, 26, 9, 0, 0, TimeSpan.Zero);
 
+    /// <summary>Stejné nastavení jako ve webovém API (camelCase názvy vlastností).</summary>
+    private static readonly JsonSerializerOptions WebOptions = new(JsonSerializerDefaults.Web);
+
     private static CreateRepeatingTodoItemRequest CreateValidRequest() => new()
     {
         Title = "Týdenní report",
+        UserId = "jan.novak",
         FirstDueAtUtc = FirstDue,
         RepeatCount = 3
     };
@@ -65,6 +70,41 @@ public sealed class CreateRepeatingTodoItemRequestTests
         var request = CreateValidRequest() with { Priority = (TodoPriority)99 };
 
         AssertSingleErrorFor(request, nameof(CreateRepeatingTodoItemRequest.Priority));
+    }
+
+    // AC 2, 5: chybějící, null, prázdný i jen z mezer složený userId validace odmítne.
+    // Požadavek vzniká z JSON stejně jako v API – jen tak se do vlastnosti typu string dostane null.
+    [Theory]
+    [InlineData("""{"title":"Úkol","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""")]
+    [InlineData("""{"title":"Úkol","userId":null,"firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""")]
+    [InlineData("""{"title":"Úkol","userId":"","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""")]
+    [InlineData("""{"title":"Úkol","userId":"   ","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}""")]
+    public void Validate_MissingUserId_FailsOnUserId(string json)
+    {
+        var request = Assert.IsType<CreateRepeatingTodoItemRequest>(
+            JsonSerializer.Deserialize<CreateRepeatingTodoItemRequest>(json, WebOptions));
+
+        AssertSingleErrorFor(request, nameof(CreateRepeatingTodoItemRequest.UserId));
+    }
+
+    // AC 5: userId o délce 1 i 100 znaků projde.
+    [Theory]
+    [InlineData(1)]
+    [InlineData(100)]
+    public void Validate_UserIdWithinLimit_IsValid(int length)
+    {
+        var request = CreateValidRequest() with { UserId = new string('u', length) };
+
+        Assert.Empty(Validate(request));
+    }
+
+    // AC 2, 5: userId delší než 100 znaků validace odmítne.
+    [Fact]
+    public void Validate_UserIdOverLimit_FailsOnUserId()
+    {
+        var request = CreateValidRequest() with { UserId = new string('u', 101) };
+
+        AssertSingleErrorFor(request, nameof(CreateRepeatingTodoItemRequest.UserId));
     }
 
     // --- Termín prvního výskytu ---------------------------------------------

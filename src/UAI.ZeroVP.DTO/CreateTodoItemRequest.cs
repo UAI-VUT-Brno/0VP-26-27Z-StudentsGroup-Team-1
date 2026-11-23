@@ -29,4 +29,18 @@ public sealed record CreateTodoItemRequest
     [DefaultValue(TodoPriority.Normal)]
     [EnumDataType(typeof(TodoPriority), ErrorMessage = "Neplatná hodnota priority.")]
     public TodoPriority Priority { get; init; } = TodoPriority.Normal;
+
+    /// <summary>
+    /// Identifikátor uživatele, kterému úkol patří (jméno, ID nebo e-mail).
+    /// Povinný, 1–100 znaků, ořízne se. Zatím bez ověřování.
+    /// </summary>
+    /// <remarks>
+    /// Záměrně bez klíčového slova <c>required</c>: to vynucuje už deserializace JSON,
+    /// takže úplně chybějící pole by skončilo chybou deserializace a hláška
+    /// z <c>[Required]</c> by se ke klientovi nikdy nedostala.
+    /// </remarks>
+    /// <example>jan.novak</example>
+    [Required(AllowEmptyStrings = false, ErrorMessage = "Identifikátor uživatele je povinný.")]
+    [StringLength(100, MinimumLength = 1, ErrorMessage = "Identifikátor uživatele musí mít 1 až 100 znaků.")]
+    public string UserId { get; init; } = string.Empty;
 }

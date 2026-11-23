@@ -11,7 +11,7 @@ namespace UAI.ZeroVP.DTO;
 /// Každý výskyt je samostatný úkol – nejde o trvalé pravidlo opakování.
 /// </summary>
 /// <remarks>
-/// Pravidla pro název, popis a prioritu musí odpovídat <see cref="CreateTodoItemRequest"/>.
+/// Pravidla pro název, popis, prioritu a vlastníka musí odpovídat <see cref="CreateTodoItemRequest"/>.
 /// </remarks>
 public sealed record CreateRepeatingTodoItemRequest : IValidatableObject
 {
@@ -43,6 +43,19 @@ public sealed record CreateRepeatingTodoItemRequest : IValidatableObject
     [DefaultValue(TodoPriority.Normal)]
     [EnumDataType(typeof(TodoPriority), ErrorMessage = "Neplatná hodnota priority.")]
     public TodoPriority Priority { get; init; } = TodoPriority.Normal;
+
+    /// <summary>
+    /// Identifikátor uživatele, kterému úkol patří (jméno, ID nebo e-mail).
+    /// Povinný, 1–100 znaků, ořízne se. Zatím bez ověřování. Dostane ho každý výskyt.
+    /// </summary>
+    /// <remarks>
+    /// Bez klíčového slova <c>required</c> ze stejného důvodu jako
+    /// u <see cref="CreateTodoItemRequest.UserId"/>.
+    /// </remarks>
+    /// <example>jan.novak</example>
+    [Required(AllowEmptyStrings = false, ErrorMessage = "Identifikátor uživatele je povinný.")]
+    [StringLength(100, MinimumLength = 1, ErrorMessage = "Identifikátor uživatele musí mít 1 až 100 znaků.")]
+    public string UserId { get; init; } = string.Empty;
 
     /// <summary>
     /// Termín prvního výskytu ve formátu ISO 8601, např. <c>2026-10-26T09:00:00Z</c>. Povinný.

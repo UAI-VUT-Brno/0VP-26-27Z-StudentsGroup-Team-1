@@ -36,7 +36,7 @@ public sealed class ApiResponseTimeTests : IClassFixture<PerformanceApiFactory>
         _output = output;
         _responseTimeBudgetMs = factory.Services.GetRequiredService<IConfiguration>().GetValue<double>("Performance:ResponseTimeBudgetMs");
     }
-    
+
     [PerformanceFact]
     public async Task ReadEndpoints_UnderConcurrentLoad_StayWithinBudget()
     {
@@ -69,7 +69,7 @@ public sealed class ApiResponseTimeTests : IClassFixture<PerformanceApiFactory>
     private static async Task WriteScenarioAsync(TimedHttpClient client)
     {
         var created = await client.SendAsync("POST /api/todos", HttpMethod.Post, "/api/todos",
-            new CreateTodoItemRequest { Title = "Zátěžový test", Priority = TodoPriority.High });
+            new CreateTodoItemRequest { Title = "Zátěžový test", Priority = TodoPriority.High, UserId = "zatezovy.test" });
         var id = JsonSerializer.Deserialize<TodoItemDto>(created, TimedHttpClient.Json)!.Id;
 
         await client.SendAsync("PUT /api/todos/{id}", HttpMethod.Put, $"/api/todos/{id}",
@@ -79,7 +79,7 @@ public sealed class ApiResponseTimeTests : IClassFixture<PerformanceApiFactory>
     }
 
     // --- Pomocné metody ------------------------------------------------------
-    
+
     /// <summary>
     /// Scénář nejdřív jednou proběhne „naprázdno“ se všemi uživateli najednou. Tím se zkompiluje
     /// kód (JIT) a thread pool naroste na potřebný počet vláken ještě před měřením.
@@ -101,7 +101,7 @@ public sealed class ApiResponseTimeTests : IClassFixture<PerformanceApiFactory>
         return items[0].Id;
     }
 
-        private void AssertWithinBudget(IReadOnlyList<RequestSample> samples)
+    private void AssertWithinBudget(IReadOnlyList<RequestSample> samples)
     {
         var statistics = EndpointStatistics.From(samples);
 
