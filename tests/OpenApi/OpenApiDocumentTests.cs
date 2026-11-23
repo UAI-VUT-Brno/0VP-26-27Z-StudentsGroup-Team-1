@@ -63,6 +63,7 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
 
     // --- Úplnost -------------------------------------------------------------
 
+    // AC 8: PUT a DELETE dokumentují nové odpovědi 400 a 409.
     [Theory]
     [InlineData("GET", "/api/todos", "200 400 500")]
     [InlineData("POST", "/api/todos", "201 400 415 500")]
@@ -124,6 +125,20 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
         Assert.Equal(ParameterLocation.Query, userId.In);
         Assert.False(userId.Required);
     }
+
+    // AC 8: DELETE dokumentuje povinný celočíselný parametr version v query.
+    [Fact]
+    public async Task Delete_DocumentsRequiredVersionQueryParameter()
+    {
+        var operation = GetOperation(await LoadDocumentAsync(), "DELETE", "/api/todos/{id}");
+
+        Assert.NotNull(operation.Parameters);
+        var version = Assert.Single(operation.Parameters, parameter => parameter.Name == "version");
+        Assert.Equal(ParameterLocation.Query, version.In);
+        Assert.True(version.Required);
+        Assert.NotNull(version.Schema);
+        Assert.True(version.Schema.Type?.HasFlag(JsonSchemaType.Integer));
+    }
     // --- Typy a struktura ----------------------------------------------------
 
     [Fact]
@@ -140,6 +155,30 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
         var schema = (await LoadDocumentAsync()).Components!.Schemas!["InstanceInfoDto"];
 
         Assert.Equal(JsonSchemaType.Integer, schema.Properties!["todoCount"].Type);
+    }
+
+    // AC 1, AC 8: Odpověď s úkolem dokumentuje version jako povinné celé číslo.
+    [Fact]
+    public async Task TodoItemDto_DocumentsVersionAsRequiredInteger()
+    {
+        var schema = GetSchema(await LoadDocumentAsync(), "TodoItemDto");
+
+        Assert.NotNull(schema.Required);
+        Assert.Contains("version", schema.Required);
+        Assert.NotNull(schema.Properties);
+        Assert.Equal(JsonSchemaType.Integer, schema.Properties["version"].Type);
+    }
+
+    // AC 8: Tělo PUT dokumentuje version jako povinné celé číslo.
+    [Fact]
+    public async Task UpdateRequest_DocumentsVersionAsRequired()
+    {
+        var schema = GetSchema(await LoadDocumentAsync(), "UpdateTodoItemRequest");
+
+        Assert.NotNull(schema.Required);
+        Assert.Contains("version", schema.Required);
+        Assert.NotNull(schema.Properties);
+        Assert.True(schema.Properties["version"].Type?.HasFlag(JsonSchemaType.Integer));
     }
 
     [Fact]
@@ -220,6 +259,8 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
 
     // --- Shoda se skutečnými odpověďmi ---------------------------------------
 
+    // AC 3, AC 6, AC 8: Chybějící či neplatná verze vrací zdokumentovanou 400;
+    // platná verze u neexistujícího úkolu zdokumentovanou 404.
     [Theory]
     [InlineData("GET", "/api/todos", "/api/todos", null, null, 200)]
     [InlineData("GET", "/api/todos?isCompleted=abc", "/api/todos", null, null, 400)]
@@ -231,9 +272,12 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
     [InlineData("POST", "/api/todos/repeat", "/api/todos/repeat", "Úkol", "text/plain", 415)]
     [InlineData("GET", "/api/todos/" + MissingId, "/api/todos/{id}", null, null, 404)]
     [InlineData("PUT", "/api/todos/" + MissingId, "/api/todos/{id}", "{\"title\":\"Úkol\",\"version\":1}", "application/json", 404)]
+    [InlineData("PUT", "/api/todos/" + MissingId, "/api/todos/{id}", "{\"title\":\"Úkol\"}", "application/json", 400)]
     [InlineData("PUT", "/api/todos/" + MissingId, "/api/todos/{id}", "Úkol", "text/plain", 415)]
     [InlineData("POST", "/api/todos/" + MissingId + "/complete", "/api/todos/{id}/complete", null, null, 404)]
     [InlineData("DELETE", "/api/todos/" + MissingId + "?version=1", "/api/todos/{id}", null, null, 404)]
+    [InlineData("DELETE", "/api/todos/" + MissingId, "/api/todos/{id}", null, null, 400)]
+    [InlineData("DELETE", "/api/todos/" + MissingId + "?version=abc", "/api/todos/{id}", null, null, 400)]
     [InlineData("GET", "/api/info", "/api/info", null, null, 200)]
     [InlineData("GET", "/health", "/health", null, null, 200)]
     public async Task Response_MatchesDocument(
@@ -247,6 +291,7 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
         await AssertDocumentedAsync(document, method, documentedPath, response);
     }
 
+    // AC 2, AC 8: Celý životní cyklus s verzemi odpovídá dokumentu.
     [Fact]
     public async Task SuccessfulTodoLifecycle_MatchesDocument()
     {
@@ -277,6 +322,30 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
         await AssertDocumentedAsync(document, "DELETE", "/api/todos/{id}", deleted);
     }
 
+    // AC 3, AC 8: Skutečné odpovědi 409 z PUT i DELETE uvádí dokument včetně typu obsahu a hlavičky X-Instance-Id.
+    [Fact]
+    public async Task StaleVersion_ConflictResponses_MatchDocument()
+    {
+        var document = await LoadDocumentAsync();
+        using var created = await SendAsync(_client, "POST", "/api/todos", "{\"userId\":\"jan.novak\",\"title\":\"Úkol\"}", "application/json");
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var location = created.Headers.Location;
+        Assert.NotNull(location);
+        var url = location.AbsolutePath;
+
+        // Dokončení zvýší verzi na 2, verze 1 je tak zastaralá.
+        using var completed = await SendAsync(_client, "POST", url + "/complete");
+        Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
+
+        using var staleUpdate = await SendAsync(_client, "PUT", url, "{\"title\":\"Úkol\",\"version\":1}", "application/json");
+        Assert.Equal(HttpStatusCode.Conflict, staleUpdate.StatusCode);
+        await AssertDocumentedAsync(document, "PUT", "/api/todos/{id}", staleUpdate);
+
+        using var staleDelete = await SendAsync(_client, "DELETE", url + "?version=1");
+        Assert.Equal(HttpStatusCode.Conflict, staleDelete.StatusCode);
+        await AssertDocumentedAsync(document, "DELETE", "/api/todos/{id}", staleDelete);
+    }
+
     [Fact]
     public async Task UnhandledException_ReturnsDocumentedServerError()
     {
@@ -301,6 +370,17 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
         var json = await _client.GetStringAsync("/openapi/v1.json");
 
         return OpenApiDocument.Parse(json, OpenApiConstants.Json).Document!;
+    }
+
+    private static IOpenApiSchema GetSchema(OpenApiDocument document, string name)
+    {
+        var components = document.Components;
+        Assert.NotNull(components);
+        var schemas = components.Schemas;
+        Assert.NotNull(schemas);
+        Assert.True(schemas.TryGetValue(name, out var schema), $"Schéma {name} v dokumentu chybí.");
+
+        return schema;
     }
 
     private static OpenApiOperation GetOperation(OpenApiDocument document, string method, string path)
