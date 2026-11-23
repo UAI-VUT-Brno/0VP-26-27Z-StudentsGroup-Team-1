@@ -10,7 +10,7 @@ can be tried out.
   There is no hand-written copy that could drift from the implementation.
 - The document is served as JSON and YAML. Swagger UI on top of it lets you send requests from the browser.
 - All 9 endpoints are documented, including `/health` and every error response the API can return
-  (`400`, `404`, `415`, `500`, `503`).
+  (`400`, `404`, `409`, `415`, `500`, `503`).
 - Automated tests check that the document is valid OpenAPI and that it matches what the API really returns.
 
 ## Where to find it
@@ -39,15 +39,19 @@ curl http://localhost:5258/openapi/v1.yaml -o openapi.yaml
 | `POST` | `/api/todos` | body `CreateTodoItemRequest` | `201` `TodoItemDto` + `Location` header, `400`, `415`, `500` |
 | `POST` | `/api/todos/repeat` | body `CreateRepeatingTodoItemRequest` | `201` list of `TodoItemDto` + `Location` header of the first occurrence, `400`, `415`, `500` |
 | `GET` | `/api/todos/{id}` | path `id` (uuid) | `200` `TodoItemDto`, `404`, `500` |
-| `PUT` | `/api/todos/{id}` | path `id` (uuid), body `UpdateTodoItemRequest` | `200` `TodoItemDto`, `400`, `404`, `415`, `500` |
-| `DELETE` | `/api/todos/{id}` | path `id` (uuid) | `204` no body, `404`, `500` |
+| `PUT` | `/api/todos/{id}` | path `id` (uuid), body `UpdateTodoItemRequest` with the required `version` (integer, at least 1) | `200` `TodoItemDto`, `400`, `404`, `409`, `415`, `500` |
+| `DELETE` | `/api/todos/{id}` | path `id` (uuid), query `version` (integer, required, at least 1) | `204` no body, `400`, `404`, `409`, `500` |
 | `POST` | `/api/todos/{id}/complete` | path `id` (uuid) | `200` `TodoItemDto`, `404`, `500` |
 | `GET` | `/api/info` | – | `200` `InstanceInfoDto`, `500` |
 | `GET` | `/health` | – | `200` / `503` plain text `Healthy`, `Degraded` or `Unhealthy` |
 
 Error responses use `ProblemDetails` (RFC 9457); validation errors use `ValidationProblemDetails`
-with an `errors` object. Errors returned by the controllers have the content type `application/json`,
+with an `errors` object. Errors returned by the controllers, including `409`, have the content type `application/json`,
 the `500` from the exception handler has `application/problem+json`. The document lists exactly these types.
+
+`TodoItemDto` has a required integer `version`. A client sends it back with `PUT` (in the body) and `DELETE`
+(as `?version=`). A missing or non-positive version is a `400` validation error. A version that does not match
+the stored one is a `409` whose `detail` names the current version; nothing is written.
 
 ## How the document is generated
 
@@ -111,9 +115,12 @@ and reads the document with the `Microsoft.OpenApi` library, the same way client
 | `Operation_DocumentsAllResponses` | Each operation has a summary and exactly the expected status codes, each with a description |
 | `Priority_IsDocumentedAsTheStringsTheApiSends`, `Numbers_AreDocumentedAsIntegersOnly` | Data types match the JSON the API sends |
 | `DateWithCustomConverter_IsDocumentedAsDateTimeString` | `firstDueAtUtc` is documented as a `date-time` string despite its custom converter |
+| `TodoItemDto_DocumentsVersionAsRequiredInteger`, `UpdateRequest_DocumentsVersionAsRequired` | `version` is a required integer in the task response and in the `PUT` body |
+| `Delete_DocumentsRequiredVersionQueryParameter` | `DELETE` documents `version` as a required integer query parameter |
 | `CreatedResponse_DocumentsLocationHeader`, `EveryResponse_DocumentsInstanceHeader`, `NoContentResponse_HasNoBody`, `ErrorResponses_UseProblemDetails` | Response headers, bodies and error schemas |
 | `RequestBody_IsDescribedByTheRequestParameter` | Guards the `<param>` order described above |
-| `Response_MatchesDocument`, `SuccessfulTodoLifecycle_MatchesDocument` | Real requests (success, `400`, `404`, `415`) return a status code, content type and required headers listed in the document |
+| `Response_MatchesDocument`, `SuccessfulTodoLifecycle_MatchesDocument` | Real requests (success, `400`, `404`, `415`) return a status code, content type and required headers listed in the document; `PUT` and `DELETE` without a version return the documented `400` |
+| `StaleVersion_ConflictResponses_MatchDocument` | Real `409` responses from `PUT` and `DELETE` with a stale version match the document, including content type and `X-Instance-Id` |
 | `UnhandledException_ReturnsDocumentedServerError` | With a failing repository the API returns the documented `500` |
 
 Logs of these tests are written to a temp directory (`uai-zerovp-openapi-tests`), not to `src/UAI.ZeroVP.API/logs/`.

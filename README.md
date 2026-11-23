@@ -81,9 +81,9 @@ Podrobnosti v [docs/multiple-instances.md](docs/multiple-instances.md).
 | `GET` | `/api/todos/{id}` | Detail úkolu |
 | `POST` | `/api/todos` | Založení úkolu → `201 Created` + hlavička `Location` |
 | `POST` | `/api/todos/repeat` | Založení týdně se opakujícího úkolu → `201 Created` se všemi výskyty |
-| `PUT` | `/api/todos/{id}` | Úplná aktualizace úkolu |
+| `PUT` | `/api/todos/{id}` | Úplná aktualizace úkolu; v těle povinné pole `version` → při zastaralé verzi `409 Conflict` |
 | `POST` | `/api/todos/{id}/complete` | Označení úkolu za dokončený |
-| `DELETE` | `/api/todos/{id}` | Smazání úkolu → `204 No Content` |
+| `DELETE` | `/api/todos/{id}` | Smazání úkolu; povinný parametr `?version=<verze>` → `204 No Content`, při zastaralé verzi `409 Conflict` |
 | `GET` | `/api/info` | Jméno instance, hostname, prostředí, doba běhu, počet úkolů v úložišti |
 | `GET` | `/health` | Kontrola zdraví – použije ji `HEALTHCHECK` v Dockerfile |
 | `GET` | `/swagger` | Interaktivní dokumentace Swagger UI |
@@ -117,6 +117,30 @@ Při chybě ve vstupu vrátí API `400 Bad Request` a nevytvoří žádný úkol
 Výskyty jsou samostatné úkoly, ne trvalé pravidlo opakování: dokončení nebo smazání jednoho
 se ostatních nedotkne. Každý úkol má v odpovědi pole `dueAtUtc`; úkoly založené přes
 `POST /api/todos` termín nemají (`null`).
+
+### Verze úkolu
+
+Každý úkol má verzi, kterou spravuje server. Všechny odpovědi s úkolem obsahují pole `version`
+(kladné celé číslo). Nový úkol začíná na verzi 1, úkoly ze souboru uloženého před zavedením verzí
+se načtou také s verzí 1. Každý úspěšný zápis verzi zvýší o 1 – i `POST /api/todos/{id}/complete`,
+který verzi od klienta nepřebírá a vrátí úkol s novou verzí.
+
+Úprava a smazání vyžadují verzi, kterou klient naposledy četl:
+
+- `PUT /api/todos/{id}` – pole `version` v těle požadavku,
+- `DELETE /api/todos/{id}` – parametr `?version=<verze>`.
+
+Když se verze liší od uložené (úkol mezitím změnil někdo jiný, třeba přes jinou instanci), API vrátí
+`409 Conflict` s `ProblemDetails`, jehož `detail` uvádí aktuální verzi, a nic nezapíše ani nesmaže.
+Klient má úkol načíst znovu a změnu zopakovat s novou verzí. Chybějící nebo neplatná verze (není kladné
+celé číslo) vrátí `400` s `ValidationProblemDetails`; platná verze u neexistujícího úkolu vrátí `404`.
+
+```bash
+curl -X PUT http://localhost:5258/api/todos/<id> \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Napsat Dockerfile","priority":"High","version":1}'
+curl -X DELETE "http://localhost:5258/api/todos/<id>?version=2"
+```
 
 
 Pro čtení úkolů v lokálním vývoji je k dispozici také [MCP](docs/mcp.md).
