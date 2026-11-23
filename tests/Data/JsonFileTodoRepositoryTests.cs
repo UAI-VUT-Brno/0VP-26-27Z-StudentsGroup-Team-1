@@ -38,10 +38,11 @@ public sealed class JsonFileTodoRepositoryTests : IDisposable
             new InMemoryTodoOptions { SeedSampleData = seedSampleData });
     }
 
-    private static TodoItem CreateItem(string title = "Úkol") => new()
+    private static TodoItem CreateItem(string title = "Úkol", string? userId = null) => new()
     {
         Id = Guid.NewGuid(),
         Title = title,
+        UserId = userId,
         CreatedAtUtc = DateTimeOffset.UtcNow
     };
 
@@ -95,6 +96,56 @@ public sealed class JsonFileTodoRepositoryTests : IDisposable
             }));
 
         Assert.Equal(2 * tasksPerInstance, await CreateRepository().CountAsync());
+    }
+
+    // AC 1, 4, 7: vlastník projde souborem – druhá instance ho přečte beze změny.
+    [Fact]
+    public async Task Add_WithUserId_IsVisibleThroughAnotherInstance()
+    {
+        var instanceA = CreateRepository();
+        var instanceB = CreateRepository();
+        var item = CreateItem("Z instance A", userId: "jan.novak");
+
+        await instanceA.AddAsync(item);
+
+        var stored = await instanceB.GetByIdAsync(item.Id);
+        Assert.NotNull(stored);
+        Assert.Equal("jan.novak", stored.UserId);
+    }
+
+    // --- Soubor ze starší verze ---------------------------------------------
+
+    // AC 7: úkoly ze souboru bez userId přežijí zápis nového úkolu a zůstanou bez vlastníka.
+    [Fact]
+    public async Task LegacyFileWithoutUserId_TasksSurviveAWrite()
+    {
+        var legacyId = Guid.Parse("0f8fad5b-d9cb-469f-a165-70867728950e");
+        Directory.CreateDirectory(_directory);
+        await File.WriteAllTextAsync(FilePath, """
+            [
+              {
+                "id": "0f8fad5b-d9cb-469f-a165-70867728950e",
+                "title": "Úkol ze starší verze",
+                "description": null,
+                "priority": "Normal",
+                "isCompleted": false,
+                "dueAtUtc": null,
+                "createdAtUtc": "2026-10-25T12:00:00+00:00",
+                "completedAtUtc": null,
+                "updatedAtUtc": "2026-10-25T12:00:00+00:00"
+              }
+            ]
+            """);
+        var repository = CreateRepository();
+        var added = CreateItem("Nový úkol", userId: "jan.novak");
+
+        await repository.AddAsync(added);
+
+        var items = await CreateRepository().GetAllAsync();
+        Assert.Equal(2, items.Count);
+        Assert.Null(Assert.Single(items, item => item.Id == legacyId).UserId);
+        Assert.Equal("jan.novak", Assert.Single(items, item => item.Id == added.Id).UserId);
+        Assert.Contains("\"userId\": null", await File.ReadAllTextAsync(FilePath));
     }
 
     // --- Chybějící soubor ---------------------------------------------------

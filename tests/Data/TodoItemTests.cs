@@ -22,6 +22,7 @@ public sealed class TodoItemTests
         DueAtUtc = CreatedAt.AddDays(7),
         CreatedAtUtc = CreatedAt,
         CompletedAtUtc = CreatedAt.AddHours(2),
+        UserId = "jan.novak",
         UpdatedAtUtc = CreatedAt.AddHours(3)
     };
 

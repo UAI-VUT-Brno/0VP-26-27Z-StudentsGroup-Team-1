@@ -22,17 +22,19 @@ public sealed class InMemoryTodoRepositoryTests
         TodoPriority priority = TodoPriority.Normal,
         bool isCompleted = false,
         DateTimeOffset? createdAtUtc = null,
-        DateTimeOffset? dueAtUtc = null) => new()
+        DateTimeOffset? dueAtUtc = null,
+        string? userId = null) => new()
 
-    {
-        Id = Guid.NewGuid(),
-        Title = title,
-        Priority = priority,
-        IsCompleted = isCompleted,
-        DueAtUtc = dueAtUtc,
-        CreatedAtUtc = createdAtUtc ?? Now,
-        UpdatedAtUtc = createdAtUtc ?? Now
-    };
+        {
+            Id = Guid.NewGuid(),
+            Title = title,
+            Priority = priority,
+            IsCompleted = isCompleted,
+            DueAtUtc = dueAtUtc,
+            UserId = userId,
+            CreatedAtUtc = createdAtUtc ?? Now,
+            UpdatedAtUtc = createdAtUtc ?? Now
+        };
 
     // --- Ukázková data ------------------------------------------------------
 
@@ -95,6 +97,21 @@ public sealed class InMemoryTodoRepositoryTests
         item.Title = "Změněno zvenčí";
 
         Assert.Equal("Původní název", (await repository.GetByIdAsync(item.Id))!.Title);
+    }
+
+    // AC 7: úkoly ze starší verze souboru vlastníka nemají – načtou se s null, ne s chybou.
+    [Fact]
+    public async Task Constructor_InitialItemsWithoutUserId_AreLoadedWithNullUserId()
+    {
+        var legacy = CreateItem("Ze starého souboru");
+
+        var repository = new InMemoryTodoRepository(
+            new InMemoryTodoOptions { SeedSampleData = true },
+            initialItems: [legacy]);
+
+        var stored = Assert.Single(await repository.GetAllAsync());
+        Assert.Equal(legacy.Id, stored.Id);
+        Assert.Null(stored.UserId);
     }
 
     [Fact]
@@ -177,7 +194,22 @@ public sealed class InMemoryTodoRepositoryTests
 
         await Assert.ThrowsAsync<ArgumentNullException>(() => repository.AddAsync(null!));
     }
-    
+
+    // AC 1, 4: vlastník se uloží s úkolem a vrátí se beze změny, včetně velikosti písmen.
+    [Fact]
+    public async Task AddAsync_ItemWithUserId_StoresUserId()
+    {
+        var repository = CreateEmptyRepository();
+        var item = CreateItem(userId: "Jan.Novak");
+
+        var returned = await repository.AddAsync(item);
+
+        Assert.Equal("Jan.Novak", returned.UserId);
+        var stored = await repository.GetByIdAsync(item.Id);
+        Assert.NotNull(stored);
+        Assert.Equal("Jan.Novak", stored.UserId);
+    }
+
     // --- Přidání více úkolů najednou ----------------------------------------
 
     [Fact]
@@ -212,6 +244,29 @@ public sealed class InMemoryTodoRepositoryTests
         Assert.Equal(items.Select(item => item.Id), returned.Select(item => item.Id));
         Assert.All(returned.Zip(items), pair => Assert.NotSame(pair.Second, pair.First));
         Assert.Equal("První", (await repository.GetByIdAsync(items[0].Id))!.Title);
+    }
+
+    // AC 1, 4: v dávce (opakovaný úkol) si každý úkol nese svého vlastníka.
+    [Fact]
+    public async Task AddRangeAsync_EveryItemKeepsItsUserId()
+    {
+        var repository = CreateEmptyRepository();
+        var items = new[]
+        {
+            CreateItem("První", userId: "jan.novak"),
+            CreateItem("Druhý", userId: "petra.svobodova"),
+            CreateItem("Třetí", userId: "jan.novak")
+        };
+
+        var returned = await repository.AddRangeAsync(items);
+
+        Assert.Equal(items.Select(item => item.UserId), returned.Select(item => item.UserId));
+        foreach (var item in items)
+        {
+            var stored = await repository.GetByIdAsync(item.Id);
+            Assert.NotNull(stored);
+            Assert.Equal(item.UserId, stored.UserId);
+        }
     }
 
     [Fact]
@@ -409,6 +464,26 @@ public sealed class InMemoryTodoRepositoryTests
         item.Title = "Změněno po uložení";
 
         Assert.Equal("Uloženo", (await repository.GetByIdAsync(item.Id))!.Title);
+    }
+
+    // AC 6: úprava načteného úkolu (jako v API: přečíst, změnit, uložit) vlastníka zachová.
+    [Fact]
+    public async Task UpdateAsync_KeepsUserId()
+    {
+        var repository = CreateEmptyRepository();
+        var item = CreateItem("Původní", userId: "jan.novak");
+        await repository.AddAsync(item);
+
+        var loaded = await repository.GetByIdAsync(item.Id);
+        Assert.NotNull(loaded);
+        loaded.Title = "Nový název";
+        loaded.IsCompleted = true;
+        Assert.True(await repository.UpdateAsync(loaded));
+
+        var stored = await repository.GetByIdAsync(item.Id);
+        Assert.NotNull(stored);
+        Assert.Equal("Nový název", stored.Title);
+        Assert.Equal("jan.novak", stored.UserId);
     }
 
     [Fact]

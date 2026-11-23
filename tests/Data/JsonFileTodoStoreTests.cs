@@ -72,6 +72,7 @@ public sealed class JsonFileTodoStoreTests : IDisposable
             DueAtUtc = Now.AddDays(7),
             CreatedAtUtc = Now.AddDays(-1),
             CompletedAtUtc = Now,
+            UserId = "jan.novak",
             UpdatedAtUtc = Now
         };
 
@@ -137,6 +138,24 @@ public sealed class JsonFileTodoStoreTests : IDisposable
         Assert.Contains("\"priority\": \"High\"", json);
     }
 
+    // AC 7: vlastník se ukládá do souboru, aby ho viděly i ostatní instance a další běh.
+    [Fact]
+    public void Save_WritesUserId()
+    {
+        var item = new TodoItem
+        {
+            Id = Guid.NewGuid(),
+            Title = "Úkol",
+            UserId = "jan.novak",
+            CreatedAtUtc = Now,
+            UpdatedAtUtc = Now
+        };
+
+        CreateStore().Save([item]);
+
+        Assert.Contains("\"userId\": \"jan.novak\"", File.ReadAllText(FilePath));
+    }
+
     [Fact]
     public void Save_LogsCount()
     {
@@ -153,6 +172,55 @@ public sealed class JsonFileTodoStoreTests : IDisposable
         Assert.Null(CreateStore().Load());
         Assert.False(Directory.Exists(_directory));
         Assert.Equal(LogLevel.Information, _logger.LatestRecord.Level);
+    }
+
+    // --- Soubor ze starší verze ---------------------------------------------
+
+    // AC 7: soubor zapsaný před zavedením userId se načte celý a vlastník je null.
+    // Nesmí se považovat za poškozený – to by ho odsunulo stranou a úkoly by z API zmizely.
+    [Fact]
+    public void Load_FileWithoutUserId_LoadsTasksWithNullUserId()
+    {
+        WriteFile("""
+            [
+              {
+                "id": "0f8fad5b-d9cb-469f-a165-70867728950e",
+                "title": "Úkol ze starší verze",
+                "description": "Uloženo před zavedením vlastníka",
+                "priority": "High",
+                "isCompleted": true,
+                "dueAtUtc": "2026-11-02T12:00:00+00:00",
+                "createdAtUtc": "2026-10-25T12:00:00+00:00",
+                "completedAtUtc": "2026-10-26T12:00:00+00:00",
+                "updatedAtUtc": "2026-10-26T12:00:00+00:00"
+              }
+            ]
+            """);
+
+        var loaded = CreateStore().Load();
+
+        Assert.NotNull(loaded);
+        var item = Assert.Single(loaded);
+        Assert.Equal(Guid.Parse("0f8fad5b-d9cb-469f-a165-70867728950e"), item.Id);
+        Assert.Equal("Úkol ze starší verze", item.Title);
+        Assert.Null(item.UserId);
+        Assert.Equal(["todos.json"], Directory.GetFiles(_directory).Select(Path.GetFileName));
+        Assert.DoesNotContain(_logger.Collector.GetSnapshot(), record => record.Level == LogLevel.Error);
+    }
+
+    // AC 7: po prvním zápisu se u starších úkolů uloží "userId": null – i to se musí načíst.
+    [Fact]
+    public void Load_UserIdNull_LoadsTaskWithNullUserId()
+    {
+        WriteFile("""
+            [{"id": "0f8fad5b-d9cb-469f-a165-70867728950e", "title": "A", "createdAtUtc": "2026-10-26T12:00:00Z", "userId": null}]
+            """);
+
+        var loaded = CreateStore().Load();
+
+        Assert.NotNull(loaded);
+        Assert.Null(Assert.Single(loaded).UserId);
+        Assert.DoesNotContain(_logger.Collector.GetSnapshot(), record => record.Level == LogLevel.Error);
     }
 
     // --- Poškozený soubor ---------------------------------------------------

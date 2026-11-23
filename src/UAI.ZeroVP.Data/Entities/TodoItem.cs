@@ -33,6 +33,18 @@ public sealed class TodoItem
     /// <summary>Okamžik dokončení (UTC), nebo <c>null</c> pokud úkol hotový není.</summary>
     public DateTimeOffset? CompletedAtUtc { get; set; }
 
+    /// <summary>
+    /// Identifikátor uživatele, kterému úkol patří, nebo <c>null</c> u úkolů uložených
+    /// dřív, než vlastník existoval.
+    /// </summary>
+    /// <remarks>
+    /// <c>init</c>, protože vlastník se určuje jen při vytvoření – úprava úkolu ho tak
+    /// nemůže omylem přepsat. Záměrně s <c>?</c> a bez <c>required</c>: starší soubory
+    /// <c>userId</c> nemají a <see cref="JsonFile.JsonFileTodoStore"/> by je jinak považoval
+    /// za poškozené, odsunul stranou a začal s prázdným seznamem.
+    /// </remarks>
+    public string? UserId { get; init; }
+
     /// <summary>Interní audit – poslední změna záznamu. Do DTO se nepromítá.</summary>
     public DateTimeOffset UpdatedAtUtc { get; set; }
 
@@ -51,6 +63,7 @@ public sealed class TodoItem
         DueAtUtc = DueAtUtc,
         CreatedAtUtc = CreatedAtUtc,
         CompletedAtUtc = CompletedAtUtc,
+        UserId = UserId,
         UpdatedAtUtc = UpdatedAtUtc
     };
 }
