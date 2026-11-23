@@ -1,12 +1,12 @@
 # From GitHub issue to verified pull request
 
-**Technical and benchmark report · 0VP Team 1 · 18 November 2026**
+**Technical and benchmark report | 0VP Team 1 | 23 November 2026**
 
-**Draft.** The workflow analysis and benchmark preflight are complete. The four timed trials and team review are pending.
+**Submission status:** technical content and benchmark analysis complete; review by every team member remains pending. This report does not certify that acceptance criterion.
 
 ## 1. Architecture
 
-`/issue-to-pr` is a Claude Code skill that reads an open GitHub issue, delegates the implementation and verification, and opens a pull request against a named base branch. The orchestrator controls stage order, passes file paths between agents, and decides when the run can proceed. The workflow revision for this report is `ecaf1bf`.
+`/issue-to-pr` is a Claude Code skill that reads an open GitHub issue, delegates implementation and verification, and opens a pull request against a named base branch. The orchestrator controls stage order, passes file paths between agents, and decides when the run can proceed. The evaluated workflow revision is `fbff347edad07eea0e17506e923ce5f952f13012`. Its pack contains `SKILL.md`, four agent definitions, prompts, rules and a plugin manifest; project permissions live separately in `.claude/settings.json`.
 
 ```text
 Issue + base
@@ -30,11 +30,13 @@ Orchestrator   Summarize tests, repair cycles, PR and run log
 | --- | --- |
 | Orchestrator | Validates issue input and the base, checks Git and GitHub access, fetches the issue, writes hand-off files, and delegates stages. |
 | Planner | Read, Grep, and Glob. Maps acceptance criteria to code, tests, and documentation. Returns a plan or a reason the issue cannot proceed. |
-| Implementer | Reads and edits application code and tests. Uses Bash for build, formatting, and scoped commits. |
-| QA and self-healing | Reads diagnostics and edits fixes. Runs the Release suite, records verification metrics, and commits repairs. |
-| Release | Edits docs and release artifacts. Uses Git and GitHub CLI to check the diff, push the feature branch, and open the PR. |
+| Implementer | Read/search, Edit, Write and Bash; edits only `src/` and `tests/`, builds, formats and commits per layer. No test execution or push. |
+| QA and self-healing | Read/search, Edit, Write and Bash; runs Release tests, diagnoses failures, formats and commits repairs. No push. |
+| Release | Read/search, Edit, Write and Bash; edits docs and run artifacts, checks the diff, pushes and creates the PR. No application edits or merge. |
 
-The API controller depends on `ITodoRepository`. The DTO layer holds the public data contracts, and the repository implementations handle in-memory and JSON-file storage. Changes that affect persistence must work through both implementations. The planner traces affected callers so a contract change can be built and tested through the normal API entry points. [Pinned workflow source](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/tree/ecaf1bf582858d40d7820c14ec37718b0e130d50/.claude)
+The API controller depends on `ITodoRepository`. The DTO layer holds public data contracts; repository implementations handle in-memory and shared JSON-file storage. Persistence changes must work through both implementations. The planner traces affected callers so a contract change can be built and tested through normal API entry points. A new repository signature can otherwise break a controller or test double even when its implementation is correct. [Pinned workflow source](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/tree/fbff347edad07eea0e17506e923ce5f952f13012/.claude)
+
+<!-- pagebreak -->
 
 ## 2. Prompt engineering and failure handling
 
@@ -44,37 +46,92 @@ The API controller depends on `ITodoRepository`. The DTO layer holds the public 
 
 **Repair reflection.** QA quotes the diagnostic or failing assertion, locates it in the code, classifies it, identifies the cause, and selects a minimal fix before making an edit. It checks for secondary compiler errors, such as callers failing after a signature change. Existing tests serve as regression checks. The repair prompt prohibits weakening assertions, skipping tests, extending timeouts to hide failures, or suppressing analyzer diagnostics. A new test that contradicts the plan can be corrected in a separate test commit.
 
-**Iteration ceiling.** The first invocation of the Release test suite is attempt one. Three further attempts allow at most three repair cycles. The repair prompt also calls for escalating an unresolved diagnosis in its output after two distinct fixes leave the same failure. If verification remains red, the release stage is designed to open a draft PR with the remaining failures. A run that stops before verification has no first-attempt outcome.
+**Iteration ceiling.** The first invocation of the Release test suite is attempt one. Three further attempts allow at most three repair cycles. If the same failure survives two distinct fixes, QA stops changing that area and reports the diagnosis. It also stops early when no allowed fix remains. If verification remains red, release is instructed to open a draft PR with remaining failures. Neither measured B run exhausted the ceiling, so that fallback is a documented path rather than an observed outcome. A test command that fails during build is a failed invocation; a run stopped before any test invocation has no first-attempt result.
 
-**Guardrails.** Preflight stops on an invalid invocation, a dirty working tree, unavailable GitHub authentication, or an out-of-date base that cannot fast-forward. The workflow also stops for a missing or closed issue or a branch-name collision. The project permission allowlist covers the expected Git, GitHub CLI, and .NET commands, plus edits to the named project paths. It denies destructive Git commands, PR merges, and issue edits. Shell-capable roles share the project allowlist. Their instructions further constrain command and file scope, so a role prompt alone is an instruction boundary. [Workflow settings and prompts](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/tree/ecaf1bf582858d40d7820c14ec37718b0e130d50/.claude)
+**Guardrails.** Parsing accepts an issue number, `#number`, or a same-repository issue URL, plus an optional base branch. Invalid input stops before Git changes. Preflight requires a clean tree, GitHub authentication, an existing remote base and a successful fast-forward update. Missing/closed issues, an unimplementable plan and branch collisions stop before implementation. Push or PR failures preserve the local branch and report the error.
 
-## 3. Benchmark
+Project permissions allow expected Git, GitHub CLI and .NET commands and edits to named project paths. They deny force pushes, destructive resets/cleaning, branch deletion, issue edits/closure and PR merges. Shell-capable roles share the project allowlist; their narrower role scopes are prompt instructions rather than separate operating-system sandboxes. The planner's read-only tools provide a stronger boundary. [Workflow settings and prompts](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/tree/fbff347edad07eea0e17506e923ce5f952f13012/.claude)
 
-The historical fixture adds task ownership across the DTO, data, and API layers, including compatibility for old JSON files. The synthetic fixture adds optimistic concurrency. Its acceptance criteria cover stale writes from separate instances that share a JSON file. Both approaches use identical issue text and a pinned application commit for each case. A fresh clone is used for every trial. The interactive Copilot trial precedes the Claude Code trial on each fixture to avoid exposing the automated solution to the interactive operator.
+Rules give existing code precedence if it disagrees with the pack and require the mismatch to be reported. This limits unrelated corrections, but case-specific rules can also leak solution guidance into an evaluation. Persisted hand-offs make that influence reviewable; they do not independently prove the model's reasoning or the correctness of its output.
 
-| Case | Approach | Green PR time | Human input | First pass | Repairs | Quality and evidence |
-| --- | --- | --- | --- | --- | --- | --- |
-| [#53 Historical](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/issues/53) | Copilot | Pending | Pending | Pending | Pending | Preflight only |
-| #53 Historical | Claude Code | Pending | Pending | Pending | Pending | Preflight only |
-| [#54 Synthetic](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/issues/54) | Copilot | Pending | Pending | Pending | Pending | Preflight only |
-| #54 Synthetic | Claude Code | Pending | Pending | Pending | Pending | Preflight only |
+<!-- pagebreak -->
 
-- **Time to a green PR** starts when the runner opens the issue and ends when the PR exists and the submitted code passes the Release suite. A stopped run needs an elapsed time and terminal stage.
-- **Human interventions** count prompts, clarifications, manual edits, and manually run commands. For Claude Code, the initial invocation starts the workflow. Additional human actions belong in the event log.
-- **First-attempt pass** captures the first Release test invocation before any test-driven repair. Baseline checks and runs that never reach testing have no value for this metric.
-- **Repair cycles** count a repair followed by a rerun after a failure. Copilot's interactive repairs and Claude Code's automated cycles should be identified separately when interpreting the counts.
-- **Code quality** uses the same checklist for every PR. It checks formatting, layer boundaries, ProblemDetails and validation, acceptance coverage, and the existing Release suite.
+## 3. Benchmark: method and measured results
 
-The preflight verified fresh clones, the GitHub issue state, and the pinned Claude plugin manifest. The Release suites passed on both starting commits. The four trials still need PR links, timed results, repair counts, and code-quality reviews. [Benchmark protocol and evidence](../benchmark.md)
+The historical case, #53, reproduces task ownership across DTO, Data and API, including compatibility with JSON saved before `userId`. Its base is `benchmark/base-t1-10` at `d562bdae94293fc044bc0353c2651f56d498b443`. Synthetic case #54 adds optimistic concurrency, stale-write errors and shared-file multi-instance tests. Its base is `benchmark/base-synthetic` at `d7466ebe8ff58b26bdf6f0a808d3172d467f0320`. Each trial used an independent clone and identical case text; A preceded B for each case. All runs used Windows 11 and .NET SDK 10.0.403. Baseline checks are setup evidence, separate from measured runs. [Protocol and consolidated evidence](../benchmark.md)
 
-## 4. Edge cases, failure modes, and model limitations
+A used VS Code 1.147.0, Copilot Free in Ask mode, and Copilot Fusion auto-selection resolved to `gpt-6-luna`. B used Claude Code 2.1.330, `claude-opus-5-5`, effort `xhigh`, Claude Pro, permission mode `default` and pack `fbff347`. The runs used protocol revision `36a8634` before its PR #57 was merged, a recorded deviation. The B pack was copied into clones and excluded locally with run artifacts. Both cases retained their pinned application baselines.
 
-**Observed access failure.** VS Code opened the historical clone in Restricted Mode and displayed a Copilot sign-in prompt. Claude Code reported no authenticated account and suppressed the project plugin in both untrusted clones. The standalone manifest validator found the skill and all four agents. Loading them in an authenticated, trusted session remains a separate preflight check. Preflight stopped before timing began. [Benchmark preflight log](../benchmark.md#failure-and-edge-case-log)
+| Run / PR / evidence | Elapsed to PR | Human input | First pass | Repairs | Final tests P/F/S |
+| --- | --- | --- | --- | --- | --- |
+| [53-A](../benchmark/runs/53-A.md) / [#58](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/pull/58) | 44m 54s, stopped | >=33 | No* | >=3 manual | 258/39/2 |
+| [53-B](../benchmark/runs/53-B.md) / [#59](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/pull/59) | 24m 17s, green | 0 | Yes | 0 | 345/0/2 |
+| [54-A](../benchmark/runs/54-A.md) / [#60](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/pull/60) | 27m 41s, stopped | >=18 | No | 0 | Build failed |
+| [54-B](../benchmark/runs/54-B.md) / [#61](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/pull/61) | 40m 48s, green | 0 timed; 1 later | No | 1 automated | 393/0/2 |
 
-**Earlier workflow evidence.** The team's task-count pilot reached a PR. The upstream workflow PR records that an intermediate commit broke a caller and that the plan expanded the change into repository code. The planner in the pinned revision now asks for all affected callers to be listed and for the smallest viable design. The benchmark review should check whether those instructions improve the commit sequence and the scope of the submitted change. [Upstream workflow PR](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/pull/52) · [Pilot PR](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/pull/51)
+Every numeric result in this table comes from the linked run's Timing and Metrics sections. P/F/S means passed/failed/skipped; the two skips are existing opt-in performance tests. Each record links underlying chat exports or session/subagent transcripts, run artifacts and the PR. No trial was screen-recorded. A counts are reconstructed lower bounds because the notes window lost entries; the historical terminal history is also incomplete.
 
-**Case-specific risks.** The historical issue leaves owner mutability as a proposal and includes backward compatibility for records without `userId`. Each PR should state how it handled that ambiguity and demonstrate old-file loading. In the synthetic case, moving the version check outside the repository write could let both API instances act on the same old version. A test against a shared JSON file should prove that a prior successful write makes the other instance's version stale.
+*53-A's first invocation was a filtered Debug test command, deviating from the full Release first-pass definition. It failed to build. The final 258/39/2 outcome comes from the later full Release run. Its first-pass result is evidence of that failed invocation, not an equivalent full-suite observation.
 
-**Interpretation limits.** The comparison evaluates two workflows. It combines differences in model, tool access, instructions, and operator input. The Claude workflow's concurrency rule gives specific guidance on where to enforce the version check, which may influence the synthetic result. Two fixtures and one run per approach per fixture will show what happened in those runs. The evidence will be too small to estimate typical performance or rank the underlying models.
+**Timing boundary.** The protocol ends timing once both the PR exists and the submitted code passes Release tests. A never reached that endpoint: its elapsed values end at runner-stopped draft PRs. B reached the green-test endpoint; #61 still had a CodeQL alert. For 54-B, the start is command entry because the separate issue-open timestamp was not captured. Times describe distinct end states and do not support a direct speedup calculation.
 
-**Completion evidence.** Each row needs a PR, verification output tied to the submitted code, a review under the shared checklist, and timestamped run evidence. At least one Claude Code trial needs a complete transcript or recording showing it reached the PR without human input. The report requires team review before submission. [Report assignment](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/issues/49)
+<!-- pagebreak -->
+
+## 3. Benchmark: interpretation of every metric
+
+**Time to a green PR.** Historical B reached a passing PR in 24m 17s, while A stopped after 44m 54s with failures. Synthetic B took 40m 48s; A's shorter 27m 41s ended with a compile error. Neither A value measures time to green, and no completion time can be estimated from the stopped runs. B's endpoint is local Release verification plus PR creation; security CI is assessed separately.
+
+**Human interventions.** Historical A has at least 33 actions: 12 prompts, at least 13 file edits and at least 8 commands. Synthetic A has at least 18: 3 prompts, at least 10 edits and 5 commands. Ask mode returns suggestions that the operator must apply, so counts partly measure workflow affordances. B had no post-invocation input during either timed window. Historical B also completed its final summary unattended; synthetic B needed one `continue` after PR creation when a usage limit interrupted the summary. That later action remains relevant even though it is outside the timed metric.
+
+**First-attempt pass.** Only historical B passed first time. Synthetic B reached testing but its newly added assertions expected the wrong response media type. Both A first test invocations failed to build, with the historical definition deviation noted above. Four trials do not estimate a reliable pass probability; a build failure must not be presented as a zero-test successful run.
+
+**Repair cycles.** Historical A required at least three manual cycles; synthetic A had none because the operator stopped immediately after the failed build. Zero repairs there says nothing about correctness. Historical B needed none; synthetic B needed one automated repair and rerun. The repair corrected new tests to match existing `application/json` responses, retaining status, detail and validation assertions. It did not change the production contract merely to satisfy new tests.
+
+**Code quality.** The shared review evaluates formatter diagnostics against the matching baseline, layering/persistence, ProblemDetails/status codes, and acceptance coverage with the Release suite. This table transcribes the [consolidated review](../benchmark.md#code-review), which supplies reasoning and PR evidence.
+
+| Review item | #58 / 53-A | #59 / 53-B | #60 / 54-A | #61 / 54-B |
+| --- | --- | --- | --- | --- |
+| Format vs baseline | Pass: 55 findings | Pass: 28 | Pass: 101 | Pass: 30 |
+| Layers / persistence | Pass | Pass | Fail: missed caller | Pass: atomic write |
+| Errors / validation | Pass | Pass | N/A: no build | Pass: 400/409 |
+| Coverage + suite | Fail: 39 failures | Pass | Fail: no tests ran | Pass |
+
+Baseline formatter counts were 55 historical and 101 synthetic. A format pass thus means no added findings, not a clean formatter exit. B reduced existing whitespace findings in touched files, adding diff noise. #58 still lacked documentation and valid fixtures; #60 left caller updates incomplete. B updated docs/OpenAPI and covered legacy-file behavior; synthetic B tested stale writes across instances. Passing functional tests does not dispose of #61's security alert.
+
+<!-- pagebreak -->
+
+## 4. Edge cases and failure modes
+
+This section derives from the execution log for task 21, implemented by issue #48 and merged PR #62, rather than the earlier preflight-only draft. [Failure log](../benchmark.md#failure-and-edge-case-log)
+
+**Fragment placement and incomplete propagation (53-A).** Ask mode returned fragments whose destinations were unclear. Apply in Editor put a `Clone()` fragment into the DTO file, causing compilation errors; the operator repaired placement manually. Requiring `userId` then invalidated existing fixtures across many files. Further prose instructions did not produce a passing suite before the stop. The practical failure was propagation across all callers and fixtures, not just generating a property. A stronger future protocol should require a caller/fixture inventory and record each applied edit.
+
+**Signature changes and missing callers (54-A).** The suggested concurrency design placed version checks in the repository, consistent with atomic shared-file writes. Changing repository signatures required every controller caller and test double to change. One remaining call passed a cancellation token where the new expected version belonged (CS1503), preventing the build. New result types also produced CS1591 documentation warnings. The runner applied only part of a long test answer, then stopped at the first build failure. A sound design was insufficient without complete integration and verification.
+
+**Incorrect test assumptions and bounded recovery (54-B).** Newly generated tests expected `application/problem+json`, but the controllers' existing contract uses `application/json`. QA diagnosed the mismatch, corrected only new tests, committed the correction separately and reran successfully. This is observed self-repair within one cycle. It does not prove that a model can safely repair arbitrary assertions: the existing contract and plan supplied an external check on the correction.
+
+**Non-blocking discovery errors (53-B).** The implementer tried to read a nonexistent `DataServiceCollectionExtensions.cs` path and recovered autonomously. The branch-existence probe also returned an expected non-zero status. These events distinguish recoverable exploration from terminal verification failures. Documentation work moved from implementation to release as the role scopes intended, and was recorded as a plan deviation.
+
+**Security signal (54-B).** CodeQL reported a high-severity missing function-level access-control alert on `TodosController.Delete`, newly surfaced after its signature gained the version parameter. The benchmark record attributes it to the pre-existing unauthenticated API design. This report records that explanation without treating it as a security clearance: build-and-test was green, but the alert remained unresolved and requires separate review.
+
+**Operational failures.** Claude Code changed version between clone creation and execution; both B transcripts identify 2.1.330. The notes window could not accept pasted text and lost most A events, while a terminal restart lost history in 53-A. Synthetic B exhausted its plan's usage allowance after release and resumed for the summary. Reliable capture, version pinning and an explicit budget policy are prerequisites for a repeatable unattended evaluation. Earlier sign-in/trust blockers were setup observations, not timed failures.
+
+<!-- pagebreak -->
+
+## 4. Model limitations, validity and submission review
+
+**Unequal assistance.** This experiment compares complete workflows, with different models, plans, tool permissions and operator effort. Copilot Free Ask mode could not directly edit the workspace; Claude Pro used a high-effort model and a specialised agent pack. Most A interventions follow from that setup. Results cannot isolate the effect of multi-agent decomposition or establish that one underlying model is better.
+
+**Case-specific prior information.** The pack was authored after task ownership existed on `main`; its rules and prompts mention `userId`. More strongly, `rules/concurrency.md` describes the synthetic version contract, atomic repository write, status codes, legacy-file default and relevant tests. The synthetic B plan cites that rule. A did not receive equivalent guidance. Historical A fetched issue-search results listing the original solution PR #29; it did not open that PR according to the record, but the search is still a leakage path. Future comparisons should use unseen cases and equal grounding material.
+
+**Stopping and measurement.** The protocol defined no common time box or stopping rule. A was stopped at different stages: after repeated ownership failures and after the first concurrency build failure. Missing A notes make intervention and repair counts lower bounds. Historical A used a filtered Debug first attempt, and synthetic B starts timing at command entry rather than a separately recorded issue opening. These deviations limit comparisons and must not be silently normalised.
+
+**Sample size and scope.** There is one trial per case per approach, with no repeated B run. Variance is unknown; no average, percentage speedup or general success rate is justified. The evidence supports a narrower finding: the configured Claude workflow produced two PRs with passing Release suites, including one fully unattended session through the final summary. The interactive Ask-mode trials produced two stopped draft PRs. One B run demonstrated a successful repair; neither tested ceiling exhaustion or failed-release recovery.
+
+For a stronger follow-up, predefine stops and budget limits, freeze tool/model versions, use durable timestamped recording, give both workflows equivalent rules, and repeat unseen cases. Review both passing tests and independent security/contract checks; model-written tests can reproduce the model's own incorrect assumptions.
+
+**Traceability and export.** The four row-level records link raw Copilot exports, command histories, B session/subagent transcripts, issue snapshots, plans, QA results and PR bodies. The consolidated review supplies quality judgments. Regenerate this six-page PDF from the Markdown with `python scripts/export-report.py` using ReportLab. Evidence links in the PDF target pinned merged revision `f026376`; page boundaries, tables and the stage diagram are preserved.
+
+**Team review before submission.** Issue #49 requires review by all team members. No completed team sign-off is present in the evidence checked for this report. Each member must review the Markdown and PDF, verify rows against the linked records, and record their name, date and outcome in the report PR before submission. This is a human acceptance step; technical completion and document checks do not satisfy it. Issue #49 should remain open until review is recorded.
+
+Sources: [report requirements #49](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/issues/49), [assignment #43](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/issues/43), [benchmark execution #62](https://github.com/UAI-VUT-Brno/0VP-26-27Z-StudentsGroup-Team-1/pull/62), [protocol, review and failure log](../benchmark.md), and the four run records linked in the results table.
