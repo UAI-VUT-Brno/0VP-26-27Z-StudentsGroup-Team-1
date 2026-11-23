@@ -84,8 +84,34 @@ public sealed class JsonFileTodoRepository : ITodoRepository
     }
 
     /// <inheritdoc />
+    public Task<TodoWriteResult> UpdateIfVersionMatchesAsync(TodoItem item, long expectedVersion, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(expectedVersion);
+
+        // Porovnání verze i zápis běží v jednom ExecuteAsync, tedy pod jedním zámkem souboru –
+        // jiná instance API nemůže zapsat mezi porovnáním a uložením.
+        return ExecuteAsync(
+            repository => repository.UpdateIfVersionMatchesAsync(item, expectedVersion, cancellationToken),
+            isWrite: true,
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
     public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default) =>
         ExecuteAsync(repository => repository.DeleteAsync(id, cancellationToken), isWrite: true, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<TodoWriteResult> DeleteIfVersionMatchesAsync(Guid id, long expectedVersion, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(expectedVersion);
+
+        // Ze stejného důvodu jako u úpravy: porovnání i smazání pod jedním zámkem souboru.
+        return ExecuteAsync(
+            repository => repository.DeleteIfVersionMatchesAsync(id, expectedVersion, cancellationToken),
+            isWrite: true,
+            cancellationToken);
+    }
 
     /// <inheritdoc />
     public Task<int> CountAsync(CancellationToken cancellationToken = default) =>

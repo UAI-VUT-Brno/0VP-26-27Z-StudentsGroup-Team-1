@@ -89,7 +89,7 @@ public sealed class InMemoryTodoRepository : ITodoRepository
         return Task.FromResult(stored.Clone());
     }
 
-       /// <inheritdoc />
+    /// <inheritdoc />
     public Task<IReadOnlyList<TodoItem>> AddRangeAsync(IEnumerable<TodoItem> items, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(items);
@@ -126,7 +126,7 @@ public sealed class InMemoryTodoRepository : ITodoRepository
 
         return Task.FromResult(result);
     }
-    
+
     /// <inheritdoc />
     public Task<bool> UpdateAsync(TodoItem item, CancellationToken cancellationToken = default)
     {
@@ -141,6 +141,9 @@ public sealed class InMemoryTodoRepository : ITodoRepository
         // přestože úkol existuje. Vyhrává poslední zapisující.
         while (_items.TryGetValue(item.Id, out var existing))
         {
+            // Verze se odvodí od právě uložené instance, ne od té od volajícího –
+            // každý úspěšný zápis ji tak zvýší přesně o 1, i když se cyklus opakuje.
+            replacement.Version = existing.Version + 1;
             if (_items.TryUpdate(item.Id, replacement, existing))
             {
                 return Task.FromResult(true);
@@ -151,11 +154,64 @@ public sealed class InMemoryTodoRepository : ITodoRepository
     }
 
     /// <inheritdoc />
+    public Task<TodoWriteResult> UpdateIfVersionMatchesAsync(TodoItem item, long expectedVersion, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(expectedVersion);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var replacement = item.Clone();
+
+        // Verze se porovnává s instancí, kterou TryUpdate vzápětí vymění, jen když je pořád uložená.
+        // Když ji mezitím vyměnilo jiné vlákno, výměna selže a v dalším kole se porovná nová verze –
+        // ta už nesouhlasí, takže souběžný zápis se nikdy nepřepíše.
+        while (_items.TryGetValue(item.Id, out var existing))
+        {
+            if (existing.Version != expectedVersion)
+            {
+                return Task.FromResult(TodoWriteResult.Conflict(existing.Clone()));
+            }
+
+            replacement.Version = existing.Version + 1;
+            if (_items.TryUpdate(item.Id, replacement, existing))
+            {
+                return Task.FromResult(TodoWriteResult.Success(replacement.Clone()));
+            }
+        }
+
+        return Task.FromResult(TodoWriteResult.NotFound());
+    }
+
+    /// <inheritdoc />
     public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         return Task.FromResult(_items.TryRemove(id, out _));
+    }
+
+    /// <inheritdoc />
+    public Task<TodoWriteResult> DeleteIfVersionMatchesAsync(Guid id, long expectedVersion, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(expectedVersion);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Stejný princip jako u úpravy: TryRemove s dvojicí klíč–instance smaže záznam jen tehdy,
+        // když je pořád uložená právě ta instance, jejíž verzi jsme porovnali.
+        while (_items.TryGetValue(id, out var existing))
+        {
+            if (existing.Version != expectedVersion)
+            {
+                return Task.FromResult(TodoWriteResult.Conflict(existing.Clone()));
+            }
+
+            if (_items.TryRemove(KeyValuePair.Create(id, existing)))
+            {
+                return Task.FromResult(TodoWriteResult.Success(existing.Clone()));
+            }
+        }
+
+        return Task.FromResult(TodoWriteResult.NotFound());
     }
 
     /// <inheritdoc />

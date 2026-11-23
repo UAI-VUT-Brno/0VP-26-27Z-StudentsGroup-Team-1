@@ -170,7 +170,7 @@ public sealed class TodosControllerTests
         Assert.Equal(Now, stored.CreatedAtUtc);
         Assert.False(stored.IsCompleted);
     }
-    
+
     [Fact]
     public async Task Create_ReturnsItemWithoutDueDate()
     {
@@ -407,7 +407,8 @@ public sealed class TodosControllerTests
 
     /// <summary>
     /// Napodobí souběh: úkol mezi načtením a uložením smaže jiný požadavek.
-    /// Kontroler ho načte, ale <c>UpdateAsync</c> už vrátí <c>false</c>.
+    /// Kontroler ho načte, ale zápis (<c>UpdateAsync</c> i <c>UpdateIfVersionMatchesAsync</c>)
+    /// už úkol nenajde.
     /// </summary>
     private sealed class DeletedBeforeUpdateRepository(ITodoRepository inner) : ITodoRepository
     {
@@ -429,8 +430,17 @@ public sealed class TodosControllerTests
             return await inner.UpdateAsync(item, cancellationToken);
         }
 
+        public async Task<TodoWriteResult> UpdateIfVersionMatchesAsync(TodoItem item, long expectedVersion, CancellationToken cancellationToken = default)
+        {
+            await inner.DeleteAsync(item.Id, cancellationToken);
+            return await inner.UpdateIfVersionMatchesAsync(item, expectedVersion, cancellationToken);
+        }
+
         public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default) =>
             inner.DeleteAsync(id, cancellationToken);
+
+        public Task<TodoWriteResult> DeleteIfVersionMatchesAsync(Guid id, long expectedVersion, CancellationToken cancellationToken = default) =>
+            inner.DeleteIfVersionMatchesAsync(id, expectedVersion, cancellationToken);
 
         public Task<int> CountAsync(CancellationToken cancellationToken = default) =>
             inner.CountAsync(cancellationToken);

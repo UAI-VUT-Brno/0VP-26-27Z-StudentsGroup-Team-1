@@ -43,6 +43,17 @@ public sealed class TodoItem
     public DateTimeOffset UpdatedAtUtc { get; set; }
 
     /// <summary>
+    /// Verze záznamu pro optimistické řízení souběhu. Zvyšuje ji jen repozitář, při každém
+    /// úspěšném zápisu o 1; klient posílá verzi, kterou naposledy četl, a zastaralý zápis se odmítne.
+    /// </summary>
+    /// <remarks>
+    /// Výchozí hodnota 1 platí pro nový úkol i pro úkol ze souboru uloženého před zavedením verzí:
+    /// deserializace chybějící vlastnost nenastaví a ponechá hodnotu z inicializátoru,
+    /// takže starý soubor se načte bez migrace.
+    /// </remarks>
+    public long Version { get; set; } = 1;
+
+    /// <summary>
     /// Vytvoří hlubokou kopii entity. In-memory repozitář ji používá proto,
     /// aby volající nemohl omylem změnit uložený stav mimo repozitář
     /// (u databázového úložiště tuto roli plní mapování na řádky tabulky).
@@ -58,6 +69,7 @@ public sealed class TodoItem
         DueAtUtc = DueAtUtc,
         CreatedAtUtc = CreatedAtUtc,
         CompletedAtUtc = CompletedAtUtc,
-        UpdatedAtUtc = UpdatedAtUtc
+        UpdatedAtUtc = UpdatedAtUtc,
+        Version = Version
     };
 }

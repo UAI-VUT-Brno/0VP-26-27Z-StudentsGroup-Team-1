@@ -24,7 +24,7 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
 {
     /// <summary>Identifikátor, který v úložišti není (ukázková data mají náhodné GUID).</summary>
     private const string MissingId = "00000000-0000-0000-0000-000000000001";
-    
+
     /// <summary>Platné tělo požadavku <c>POST /api/todos/repeat</c>.</summary>
     private const string RepeatBody = "{\"userId\":\"jan.novak\",\"title\":\"Týdenní report\",\"firstDueAtUtc\":\"2026-10-26T09:00:00Z\",\"repeatCount\":3}";
 
@@ -366,12 +366,18 @@ public sealed partial class OpenApiDocumentTests : IClassFixture<OpenApiTestFact
 
         public Task<TodoItem> AddAsync(TodoItem item, CancellationToken cancellationToken = default) => throw Failure();
 
-        public Task<IReadOnlyList<TodoItem>> AddRangeAsync(IEnumerable<TodoItem> items, CancellationToken cancellationToken = default) => 
+        public Task<IReadOnlyList<TodoItem>> AddRangeAsync(IEnumerable<TodoItem> items, CancellationToken cancellationToken = default) =>
             throw Failure();
 
         public Task<bool> UpdateAsync(TodoItem item, CancellationToken cancellationToken = default) => throw Failure();
 
+        public Task<TodoWriteResult> UpdateIfVersionMatchesAsync(TodoItem item, long expectedVersion, CancellationToken cancellationToken = default) =>
+            throw Failure();
+
         public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default) => throw Failure();
+
+        public Task<TodoWriteResult> DeleteIfVersionMatchesAsync(Guid id, long expectedVersion, CancellationToken cancellationToken = default) =>
+            throw Failure();
 
         public Task<int> CountAsync(CancellationToken cancellationToken = default) => throw Failure();
     }
