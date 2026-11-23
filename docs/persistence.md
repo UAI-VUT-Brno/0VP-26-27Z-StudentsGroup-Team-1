@@ -70,10 +70,17 @@ The file uses the same conventions as the API: camelCase property names, the pri
     "dueAtUtc": null,
     "createdAtUtc": "2026-10-25T13:00:58.762722+00:00",
     "completedAtUtc": null,
+    "userId": "jan.novak",
     "updatedAtUtc": "2026-10-25T13:00:58.762722+00:00"
   }
 ]
 ```
+
+### Files from older versions
+
+`userId`, the task owner, was added later. A file written before that has no `userId` in its tasks. `userId` is not a required field, so such a file is not treated as corrupted (the list of conditions in [File states](#file-states) does not change). Its tasks load with a `null` owner, and the API returns them with `"userId": null`. The next write rewrites the whole file and saves `"userId": null` for these tasks, which loads the same way.
+
+All instances that share one file must be upgraded together. An older instance does not know `userId`: it skips the field when it reads the file, and its next write removes `userId` from every task.
 
 ## Tests
 
@@ -81,8 +88,8 @@ Tests never touch `src/UAI.ZeroVP.API/data/`. The API test factories set `Todo:S
 
 | Test class | What it covers |
 |---|---|
-| `JsonFileTodoStoreTests` | Save and load of all fields, missing file, corrupted file variants, backup of the corrupted file, atomic overwrite |
-| `JsonFileTodoRepositoryTests` | Two repositories over one file (= two instances): changes are visible through the other one, concurrent writes lose no task, sample data are created once, a failed write leaves the file unchanged, waiting for and timing out on the lock |
+| `JsonFileTodoStoreTests` | Save and load of all fields including `userId`, a file without `userId` and a task with `"userId": null` load with a `null` owner and are not moved aside, missing file, corrupted file variants, backup of the corrupted file, atomic overwrite |
+| `JsonFileTodoRepositoryTests` | Two repositories over one file (= two instances): changes, including `userId`, are visible through the other one, concurrent writes lose no task, sample data are created once, a failed write leaves the file unchanged, waiting for and timing out on the lock; tasks from a file without `userId` survive a write with a `null` owner |
 | `JsonFileTodoDataTests` | DI registration; a change is in the file immediately; a host is stopped and a new host on the same file loads the tasks (restart), changes and deletions survive, a corrupted file at start |
 | `InMemoryTodoRepositoryTests` | The repository starts from given items instead of sample data |
 

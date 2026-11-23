@@ -79,9 +79,9 @@ Podrobnosti v [docs/multiple-instances.md](docs/multiple-instances.md).
 |---|---|---|
 | `GET` | `/api/todos` | Seznam úkolů; volitelný filtr `?isCompleted=true\|false` |
 | `GET` | `/api/todos/{id}` | Detail úkolu |
-| `POST` | `/api/todos` | Založení úkolu → `201 Created` + hlavička `Location` |
-| `POST` | `/api/todos/repeat` | Založení týdně se opakujícího úkolu → `201 Created` se všemi výskyty |
-| `PUT` | `/api/todos/{id}` | Úplná aktualizace úkolu |
+| `POST` | `/api/todos` | Založení úkolu s povinným `userId` → `201 Created` + hlavička `Location` |
+| `POST` | `/api/todos/repeat` | Založení týdně se opakujícího úkolu s povinným `userId` → `201 Created` se všemi výskyty |
+| `PUT` | `/api/todos/{id}` | Úplná aktualizace úkolu; vlastníka (`userId`) změnit nejde |
 | `POST` | `/api/todos/{id}/complete` | Označení úkolu za dokončený |
 | `DELETE` | `/api/todos/{id}` | Smazání úkolu → `204 No Content` |
 | `GET` | `/api/info` | Jméno instance, hostname, prostředí, doba běhu, počet úkolů v úložišti |
@@ -94,15 +94,32 @@ Chybové odpovědi mají jednotný tvar `ProblemDetails` (RFC 9457).
 Každá odpověď nese hlavičku `X-Instance-Id` se jménem instance, která ji obsloužila.
 Připravené požadavky k odzkoušení jsou v souboru `src/UAI.ZeroVP.API/UAI.ZeroVP.API.http`.
 
+### Vlastník úkolu (`userId`)
+
+Každý úkol patří uživateli, kterého určuje pole `userId` – libovolný řetězec, například
+jméno, ID nebo e-mail.
+
+- `POST /api/todos` i `POST /api/todos/repeat` ho vyžadují. Hodnota musí mít 1–100 znaků
+  (počítá se včetně okolních mezer), mezery na začátku a na konci se ořežou a velikost písmen
+  zůstane. Chybějící, `null`, prázdná nebo jen z mezer složená hodnota vrátí `400 Bad Request`
+  a úkol nevznikne.
+- Vlastník se určuje jen při vytvoření. `PUT /api/todos/{id}` ho změnit nejde – `userId`
+  v těle požadavku se ignoruje. Nezmění ho ani `POST /api/todos/{id}/complete`.
+- Každý úkol v odpovědi má pole `userId`. U úkolů uložených dřív, než vlastník existoval
+  (starší soubor `todos.json`), je `null`.
+- API identitu neověřuje a přístup nijak neomezuje: úkol může kdokoli založit pro kohokoli
+  a `GET` vrací úkoly všech uživatelů.
+
 ### Týdně se opakující úkol
 
-`POST /api/todos/repeat` přijme běžná pole úkolu (`title`, `description`, `priority`) a navíc:
+`POST /api/todos/repeat` přijme běžná pole úkolu (`title`, `description`, `priority`, `userId`) a navíc:
 
 - `firstDueAtUtc` – termín prvního výskytu ve formátu ISO 8601, např. `2026-10-26T09:00:00Z`;
   hodnota bez časové zóny se bere jako UTC,
 - `repeatCount` – počet **dalších** opakování po prvním výskytu, 1–52.
 
-`repeatCount: 3` tedy vytvoří čtyři úkoly, každý o sedm dní později. Odpověď `201 Created`
+`repeatCount: 3` tedy vytvoří čtyři úkoly, každý o sedm dní později a všechny se stejným
+`userId`. Odpověď `201 Created`
 obsahuje všechny výskyty seřazené podle termínu, hlavička `Location` odkazuje na první z nich.
 Při chybě ve vstupu vrátí API `400 Bad Request` a nevytvoří žádný úkol.
 
@@ -142,10 +159,10 @@ ASPNETCORE_ENVIRONMENT=Production Swagger__Enabled=true dotnet UAI.ZeroVP.API.dl
 curl http://localhost:5258/api/todos
 curl -X POST http://localhost:5258/api/todos \
   -H "Content-Type: application/json" \
-  -d '{"title":"Napsat Dockerfile","priority":"High"}'
+  -d '{"title":"Napsat Dockerfile","priority":"High","userId":"jan.novak"}'
 curl -X POST http://localhost:5258/api/todos/repeat \
   -H "Content-Type: application/json" \
-  -d '{"title":"Týdenní report","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}'
+  -d '{"title":"Týdenní report","userId":"jan.novak","firstDueAtUtc":"2026-10-26T09:00:00Z","repeatCount":3}'
 curl http://localhost:5258/api/info
 ```
 

@@ -48,7 +48,7 @@ curl http://localhost:5002/api/info
 # create a task through instance 5001 ...
 curl -X POST http://localhost:5001/api/todos \
   -H "Content-Type: application/json" \
-  -d '{"title":"Created through 5001"}'
+  -d '{"title":"Created through 5001","userId":"jan.novak"}'
 
 # ... and read it through instance 5003
 curl http://localhost:5003/api/todos
