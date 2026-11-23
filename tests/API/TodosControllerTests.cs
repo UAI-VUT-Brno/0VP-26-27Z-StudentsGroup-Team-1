@@ -64,6 +64,16 @@ public sealed class TodosControllerTests
         Assert.Contains(id.ToString(), problem.Detail);
     }
 
+    private static void AssertConflictProblem(IActionResult? result, Guid id)
+    {
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status409Conflict, objectResult.StatusCode);
+
+        var problem = Assert.IsType<ProblemDetails>(objectResult.Value);
+        Assert.Equal(StatusCodes.Status409Conflict, problem.Status);
+        Assert.Contains(id.ToString(), problem.Detail);
+    }
+
     // --- GET /api/todos -----------------------------------------------------
 
     [Fact]
@@ -292,14 +302,22 @@ public sealed class TodosControllerTests
     public async Task Update_ExistingItem_ReturnsOkAndStoresChanges()
     {
         var item = await AddItemAsync("Původní");
-        var request = new UpdateTodoItemRequest { Title = "Nový název", Priority = TodoPriority.High };
+        var request = new UpdateTodoItemRequest
+        {
+            Version = item.Version,
+            Title = "Nový název",
+            Priority = TodoPriority.High
+        };
 
         var dto = AssertOk(await CreateController().Update(item.Id, request, CancellationToken.None));
 
         Assert.Equal("Nový název", dto.Title);
+        Assert.Equal(item.Version + 1, dto.Version);
+
         var stored = await _repository.GetByIdAsync(item.Id);
         Assert.Equal("Nový název", stored!.Title);
         Assert.Equal(TodoPriority.High, stored.Priority);
+        Assert.Equal(item.Version + 1, stored.Version);
         Assert.Equal(Now, stored.UpdatedAtUtc);
     }
 
@@ -320,7 +338,10 @@ public sealed class TodosControllerTests
     {
         var id = Guid.NewGuid();
 
-        var result = await CreateController().Update(id, new UpdateTodoItemRequest { Title = "Úkol" }, CancellationToken.None);
+        var result = await CreateController().Update(
+            id,
+            new UpdateTodoItemRequest { Version = 1, Title = "Úkol" },
+            CancellationToken.None);
 
         AssertNotFoundProblem(result.Result, id);
         Assert.Equal(0, await _repository.CountAsync());
@@ -335,6 +356,52 @@ public sealed class TodosControllerTests
         var result = await controller.Update(item.Id, new UpdateTodoItemRequest { Title = "Úkol" }, CancellationToken.None);
 
         AssertNotFoundProblem(result.Result, item.Id);
+    }
+
+    [Fact]
+    public async Task Update_StaleVersion_ReturnsConflictAndLeavesItemUnchanged()
+    {
+        var item = await AddItemAsync("Original");
+        var controller = CreateController();
+
+        var firstUpdate = await controller.Update(
+            item.Id,
+            new UpdateTodoItemRequest { Version = item.Version, Title = "Current" },
+            CancellationToken.None);
+
+        Assert.Equal("Current", AssertOk(firstUpdate).Title);
+
+        var staleUpdate = await controller.Update(
+            item.Id,
+            new UpdateTodoItemRequest { Version = item.Version, Title = "Stale overwrite" },
+            CancellationToken.None);
+
+        AssertConflictProblem(staleUpdate.Result, item.Id);
+
+        var stored = await _repository.GetByIdAsync(item.Id);
+        Assert.NotNull(stored);
+        Assert.Equal("Current", stored.Title);
+        Assert.Equal(item.Version + 1, stored.Version);
+    }
+
+    [Fact]
+    public async Task Delete_StaleVersion_ReturnsConflictAndLeavesItemUnchanged()
+    {
+        var item = await AddItemAsync("Original");
+        var current = await _repository.GetByIdAsync(item.Id);
+        current!.Title = "Current";
+        var update = await _repository.UpdateAsync(current, current.Version);
+
+        Assert.Equal(TodoWriteStatus.Succeeded, update.Status);
+
+        var result = await CreateController().Delete(item.Id, version: 1, CancellationToken.None);
+
+        AssertConflictProblem(result, item.Id);
+
+        var stored = await _repository.GetByIdAsync(item.Id);
+        Assert.NotNull(stored);
+        Assert.Equal("Current", stored.Title);
+        Assert.Equal(item.Version + 1, stored.Version);
     }
 
     // --- POST /api/todos/{id}/complete --------------------------------------
@@ -423,14 +490,20 @@ public sealed class TodosControllerTests
         public Task<IReadOnlyList<TodoItem>> AddRangeAsync(IEnumerable<TodoItem> items, CancellationToken cancellationToken = default) =>
             inner.AddRangeAsync(items, cancellationToken);
 
-        public async Task<bool> UpdateAsync(TodoItem item, CancellationToken cancellationToken = default)
+        public async Task<TodoWriteResult> UpdateAsync(
+            TodoItem item,
+            int expectedVersion,
+            CancellationToken cancellationToken = default)
         {
-            await inner.DeleteAsync(item.Id, cancellationToken);
-            return await inner.UpdateAsync(item, cancellationToken);
+            await inner.DeleteAsync(item.Id, expectedVersion, cancellationToken);
+            return await inner.UpdateAsync(item, expectedVersion, cancellationToken);
         }
 
-        public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default) =>
-            inner.DeleteAsync(id, cancellationToken);
+        public Task<TodoWriteResult> DeleteAsync(
+            Guid id,
+            int expectedVersion,
+            CancellationToken cancellationToken = default) =>
+            inner.DeleteAsync(id, expectedVersion, cancellationToken);
 
         public Task<int> CountAsync(CancellationToken cancellationToken = default) =>
             inner.CountAsync(cancellationToken);

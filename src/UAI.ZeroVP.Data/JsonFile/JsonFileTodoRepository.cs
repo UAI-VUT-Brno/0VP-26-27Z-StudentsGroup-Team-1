@@ -76,16 +76,30 @@ public sealed class JsonFileTodoRepository : ITodoRepository
     }
 
     /// <inheritdoc />
-    public Task<bool> UpdateAsync(TodoItem item, CancellationToken cancellationToken = default)
+    public Task<TodoWriteResult> UpdateAsync(
+        TodoItem item,
+        int expectedVersion,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(item);
 
-        return ExecuteAsync(repository => repository.UpdateAsync(item, cancellationToken), isWrite: true, cancellationToken);
+        return ExecuteAsync(
+            repository => repository.UpdateAsync(item, expectedVersion, cancellationToken),
+            isWrite: true,
+            cancellationToken: cancellationToken,
+            shouldPersist: result => result.Status == TodoWriteStatus.Succeeded);
     }
 
     /// <inheritdoc />
-    public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default) =>
-        ExecuteAsync(repository => repository.DeleteAsync(id, cancellationToken), isWrite: true, cancellationToken);
+    public Task<TodoWriteResult> DeleteAsync(
+        Guid id,
+        int expectedVersion,
+        CancellationToken cancellationToken = default) =>
+        ExecuteAsync(
+            repository => repository.DeleteAsync(id, expectedVersion, cancellationToken),
+            isWrite: true,
+            cancellationToken: cancellationToken,
+            shouldPersist: result => result.Status == TodoWriteStatus.Succeeded);
 
     /// <inheritdoc />
     public Task<int> CountAsync(CancellationToken cancellationToken = default) =>
@@ -96,7 +110,11 @@ public sealed class JsonFileTodoRepository : ITodoRepository
     /// Chybějící nebo poškozený soubor se uloží i po čtení – jinak by každé čtení
     /// vložilo nová ukázková data s jinými identifikátory.
     /// </summary>
-    private async Task<T> ExecuteAsync<T>(Func<InMemoryTodoRepository, Task<T>> operation, bool isWrite, CancellationToken cancellationToken)
+    private async Task<T> ExecuteAsync<T>(
+        Func<InMemoryTodoRepository, Task<T>> operation,
+        bool isWrite,
+        CancellationToken cancellationToken,
+        Func<T, bool>? shouldPersist = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -110,7 +128,7 @@ public sealed class JsonFileTodoRepository : ITodoRepository
 
             var result = await operation(repository);
 
-            if (isWrite || loaded is null)
+            if (loaded is null || (isWrite && (shouldPersist?.Invoke(result) ?? true)))
             {
                 _store.Save(await repository.GetAllAsync(cancellationToken: CancellationToken.None));
             }

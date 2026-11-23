@@ -42,6 +42,9 @@ public sealed class TodoItem
     /// <summary>Interní audit – poslední změna záznamu. Do DTO se nepromítá.</summary>
     public DateTimeOffset UpdatedAtUtc { get; set; }
 
+    /// <summary>Optimistic concurrency version; new and legacy tasks start at 1.</summary>
+    public int Version { get; set; } = 1;
+
     /// <summary>
     /// Vytvoří hlubokou kopii entity. In-memory repozitář ji používá proto,
     /// aby volající nemohl omylem změnit uložený stav mimo repozitář
@@ -58,6 +61,7 @@ public sealed class TodoItem
         DueAtUtc = DueAtUtc,
         CreatedAtUtc = CreatedAtUtc,
         CompletedAtUtc = CompletedAtUtc,
-        UpdatedAtUtc = UpdatedAtUtc
+        UpdatedAtUtc = UpdatedAtUtc,
+        Version = Version
     };
 }

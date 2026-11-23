@@ -128,34 +128,57 @@ public sealed class InMemoryTodoRepository : ITodoRepository
     }
     
     /// <inheritdoc />
-    public Task<bool> UpdateAsync(TodoItem item, CancellationToken cancellationToken = default)
+    public Task<TodoWriteResult> UpdateAsync(
+        TodoItem item,
+        int expectedVersion,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(item);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var replacement = item.Clone();
-
-        // TryUpdate porovná uloženou instanci s tou, kterou jsme právě přečetli.
-        // Když ji mezitím vyměnilo jiné vlákno, porovnání selže a čte se znovu.
-        // Bez toho cyklu by souběžný zápis vrátil false, tedy 404 "úkol nenalezen",
-        // přestože úkol existuje. Vyhrává poslední zapisující.
-        while (_items.TryGetValue(item.Id, out var existing))
+        while (_items.TryGetValue(item.Id, out var current))
         {
-            if (_items.TryUpdate(item.Id, replacement, existing))
+            if (current.Version != expectedVersion)
             {
-                return Task.FromResult(true);
+                return Task.FromResult(new TodoWriteResult(TodoWriteStatus.VersionConflict));
+            }
+
+            var replacement = item.Clone();
+            replacement.Version = checked(current.Version + 1);
+
+            if (_items.TryUpdate(item.Id, replacement, current))
+            {
+                return Task.FromResult(
+                    new TodoWriteResult(TodoWriteStatus.Succeeded, replacement.Clone()));
             }
         }
 
-        return Task.FromResult(false);
+        return Task.FromResult(new TodoWriteResult(TodoWriteStatus.NotFound));
     }
 
     /// <inheritdoc />
-    public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    public Task<TodoWriteResult> DeleteAsync(
+        Guid id,
+        int expectedVersion,
+        CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        return Task.FromResult(_items.TryRemove(id, out _));
+        while (_items.TryGetValue(id, out var current))
+        {
+            if (current.Version != expectedVersion)
+            {
+                return Task.FromResult(new TodoWriteResult(TodoWriteStatus.VersionConflict));
+            }
+
+            var pair = new KeyValuePair<Guid, TodoItem>(id, current);
+            if (((ICollection<KeyValuePair<Guid, TodoItem>>)_items).Remove(pair))
+            {
+                return Task.FromResult(new TodoWriteResult(TodoWriteStatus.Succeeded));
+            }
+        }
+
+        return Task.FromResult(new TodoWriteResult(TodoWriteStatus.NotFound));
     }
 
     /// <inheritdoc />

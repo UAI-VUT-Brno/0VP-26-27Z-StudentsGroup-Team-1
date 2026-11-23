@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Time.Testing;
+using UAI.ZeroVP.Data.Abstractions;
 using UAI.ZeroVP.Data.Entities;
 using UAI.ZeroVP.Data.InMemory;
 using UAI.ZeroVP.DTO;
@@ -431,12 +432,15 @@ public async Task GetAllAsync_UserFilter_IsCaseSensitive()
 
         item.Title = "Nový název";
         item.Priority = TodoPriority.High;
-        var updated = await repository.UpdateAsync(item);
+        var result = await repository.UpdateAsync(item, item.Version);
 
-        Assert.True(updated);
+        Assert.Equal(TodoWriteStatus.Succeeded, result.Status);
+        Assert.Equal(item.Version + 1, result.Item!.Version);
+
         var stored = await repository.GetByIdAsync(item.Id);
         Assert.Equal("Nový název", stored!.Title);
         Assert.Equal(TodoPriority.High, stored.Priority);
+        Assert.Equal(item.Version + 1, stored.Version);
     }
 
     [Fact]
@@ -491,6 +495,28 @@ public async Task GetAllAsync_UserFilter_IsCaseSensitive()
         Assert.All(results, Assert.True);
     }
 
+    [Fact]
+    public async Task UpdateAsync_ConcurrentUpdatesWithSameVersion_OnlyOneSucceeds()
+    {
+        var repository = CreateEmptyRepository();
+        var item = await repository.AddAsync(CreateItem());
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 1000).Select(i => Task.Run(async () =>
+        {
+            var copy = item.Clone();
+            copy.Title = $"Version {i}";
+            return await repository.UpdateAsync(copy, item.Version);
+        })));
+
+        Assert.Single(results, result => result.Status == TodoWriteStatus.Succeeded);
+        Assert.Equal(
+            999,
+            results.Count(result => result.Status == TodoWriteStatus.VersionConflict));
+
+        var stored = await repository.GetByIdAsync(item.Id);
+        Assert.Equal(item.Version + 1, stored!.Version);
+    }
+
     // --- Mazání a počet -----------------------------------------------------
 
     [Fact]
@@ -500,9 +526,9 @@ public async Task GetAllAsync_UserFilter_IsCaseSensitive()
         var item = CreateItem();
         await repository.AddAsync(item);
 
-        var deleted = await repository.DeleteAsync(item.Id);
+        var result = await repository.DeleteAsync(item.Id, item.Version);
 
-        Assert.True(deleted);
+        Assert.Equal(TodoWriteStatus.Succeeded, result.Status);
         Assert.Null(await repository.GetByIdAsync(item.Id));
     }
 
@@ -511,7 +537,9 @@ public async Task GetAllAsync_UserFilter_IsCaseSensitive()
     {
         var repository = CreateEmptyRepository();
 
-        Assert.False(await repository.DeleteAsync(Guid.NewGuid()));
+        var result = await repository.DeleteAsync(Guid.NewGuid(), expectedVersion: 1);
+
+        Assert.Equal(TodoWriteStatus.NotFound, result.Status);
     }
 
     [Fact]

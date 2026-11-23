@@ -40,4 +40,7 @@ public sealed record TodoItemDto
 
     /// <summary>Okamžik dokončení (UTC), nebo <c>null</c> pokud úkol hotový není.</summary>
     public required DateTimeOffset? CompletedAtUtc { get; init; }
+
+    /// <summary>Current optimistic concurrency version.</summary>
+    public required int Version { get; init; }
 }

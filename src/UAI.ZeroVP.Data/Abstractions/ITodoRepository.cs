@@ -28,11 +28,26 @@ public interface ITodoRepository
     Task<IReadOnlyList<TodoItem>> AddRangeAsync(IEnumerable<TodoItem> items, CancellationToken cancellationToken = default);
 
     /// <summary>Přepíše existující úkol. Vrací <c>false</c>, pokud záznam neexistuje.</summary>
-    Task<bool> UpdateAsync(TodoItem item, CancellationToken cancellationToken = default);
+    Task<TodoWriteResult> UpdateAsync(
+        TodoItem item,
+        int expectedVersion,
+        CancellationToken cancellationToken = default);
 
     /// <summary>Smaže úkol. Vrací <c>false</c>, pokud záznam neexistuje.</summary>
-    Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<TodoWriteResult> DeleteAsync(
+        Guid id,
+        int expectedVersion,
+        CancellationToken cancellationToken = default);
 
     /// <summary>Počet úkolů v úložišti – využívá ho diagnostický endpoint.</summary>
     Task<int> CountAsync(CancellationToken cancellationToken = default);
 }
+
+public enum TodoWriteStatus
+{
+    Succeeded,
+    NotFound,
+    VersionConflict
+}
+
+public sealed record TodoWriteResult(TodoWriteStatus Status, TodoItem? Item = null);

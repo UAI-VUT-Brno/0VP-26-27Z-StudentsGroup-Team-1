@@ -2,6 +2,7 @@
 using UAI.ZeroVP.API.Mapping;
 using UAI.ZeroVP.Data.Abstractions;
 using UAI.ZeroVP.DTO;
+using System.ComponentModel.DataAnnotations;
 
 namespace UAI.ZeroVP.API.Controllers;
 
@@ -155,9 +156,15 @@ public sealed class TodosController : ControllerBase
 
         request.ApplyTo(entity, _timeProvider.GetUtcNow());
 
-        return await _repository.UpdateAsync(entity, cancellationToken)
-            ? Ok(entity.ToDto())
-            : NotFoundTodo(id);
+        var result = await _repository.UpdateAsync(entity, entity.Version, cancellationToken);
+
+        return result.Status switch
+        {
+            TodoWriteStatus.Succeeded => Ok(result.Item!.ToDto()),
+            TodoWriteStatus.NotFound => NotFoundTodo(id),
+            TodoWriteStatus.VersionConflict => VersionConflict(id),
+            _ => throw new InvalidOperationException($"Unexpected update result: {result.Status}.")
+        };
     }
 
     /// <summary>Označí úkol za dokončený.</summary>
@@ -191,17 +198,23 @@ public sealed class TodosController : ControllerBase
     /// <response code="404">Úkol se zadaným identifikátorem neexistuje.</response>
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Delete(
+        Guid id,
+        [FromQuery, Range(1, int.MaxValue)] int version,
+        CancellationToken cancellationToken)
     {
-        if (!await _repository.DeleteAsync(id, cancellationToken))
+        var result = await _repository.DeleteAsync(id, version, cancellationToken);
+
+        return result.Status switch
         {
-            return NotFoundTodo(id);
-        }
-
-        _logger.LogInformation("Smazán úkol {TodoId}.", id);
-
-        return NoContent();
+            TodoWriteStatus.Succeeded => DeleteSucceeded(id),
+            TodoWriteStatus.NotFound => NotFoundTodo(id),
+            TodoWriteStatus.VersionConflict => VersionConflict(id),
+            _ => throw new InvalidOperationException($"Unexpected delete result: {result.Status}.")
+        };
     }
 
     /// <summary>
@@ -217,4 +230,15 @@ public sealed class TodosController : ControllerBase
         statusCode: StatusCodes.Status404NotFound,
         title: "Úkol nenalezen",
         detail: $"Úkol s identifikátorem {id} neexistuje.");
+
+    private IActionResult DeleteSucceeded(Guid id)
+    {
+        _logger.LogInformation("Smazán úkol {TodoId}.", id);
+        return NoContent();
+    }
+
+    private ObjectResult VersionConflict(Guid id) => Problem(
+        statusCode: StatusCodes.Status409Conflict,
+        title: "Konflikt verze úkolu",
+        detail: $"Úkol s identifikátorem {id} byl změněn od posledního načtení.");
 }

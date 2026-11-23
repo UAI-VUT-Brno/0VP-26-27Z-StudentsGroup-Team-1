@@ -33,4 +33,8 @@ public sealed record UpdateTodoItemRequest
     /// <summary>Příznak dokončení úkolu. Výchozí hodnota je <c>false</c>.</summary>
     [DefaultValue(false)]
     public bool IsCompleted { get; init; }
+
+    /// <summary>Verze vrácená při posledním přečtení tohoto úkolu.</summary>
+    [Range(1, int.MaxValue)]
+    public int Version { get; init; }
 }
