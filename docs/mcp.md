@@ -19,7 +19,8 @@ Model Context Protocol (MCP) umožňuje klientovi objevit a volat nástroje apli
   "isCompleted": false,
   "dueAtUtc": null,
   "createdAtUtc": "2026-11-09T08:00:00+00:00",
-  "completedAtUtc": null
+  "completedAtUtc": null,
+  "version": 1
 }
 ```
 
